@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 
 export interface NestedUIElement {
   type: string
-  props?: Record<string, unknown>
+  props?: { [key: string]: {} }
   children?: NestedUIElement[]
 }
 

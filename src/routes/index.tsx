@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
-import { sendMessage } from '../server/chat'
+import { sendMessage, type SendMessageResult } from '../server/chat'
 import type { Message, NestedUIElement } from '../lib/types'
 
 export const Route = createFileRoute('/')({
@@ -14,6 +14,9 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [currentUi, setCurrentUi] = useState<NestedUIElement | null>(null)
+  const [chatWidthPercent, setChatWidthPercent] = useState(33)
+  const [isDragging, setIsDragging] = useState(false)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   const handleSendMessage = async (content: string) => {
     const userMessage: Message = {
@@ -26,12 +29,12 @@ function App() {
     setIsLoading(true)
 
     try {
-      const result = await sendMessage({
+      const result = (await sendMessage({
         data: {
           message: content,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
         },
-      })
+      })) as SendMessageResult
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
@@ -58,16 +61,54 @@ function App() {
     }
   }
 
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging || !containerRef.current) {
+      return
+    }
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const position = ((event.clientX - rect.left) / rect.width) * 100
+    const clamped = Math.min(60, Math.max(20, position))
+    setChatWidthPercent(clamped)
+  }
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setIsDragging(true)
+  }
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    setIsDragging(false)
+  }
+
   return (
-    <div className="flex h-screen">
-      <div className="w-1/2 border-r border-gray-200">
+    <div
+      ref={containerRef}
+      className="flex h-screen bg-gray-50 p-6"
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
+      <div className="min-w-0" style={{ width: `${chatWidthPercent}%` }}>
         <ChatPanel
           messages={messages}
           isLoading={isLoading}
           onSendMessage={handleSendMessage}
         />
       </div>
-      <div className="w-1/2">
+      <div
+        className={`mx-3 w-1 cursor-col-resize rounded-full transition-colors ${
+          isDragging ? 'bg-gray-300' : 'bg-gray-200 hover:bg-gray-300'
+        }`}
+        onPointerDown={handlePointerDown}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize panels"
+      />
+      <div className="min-w-0 flex-1">
         <ArtifactPanel ui={currentUi} />
       </div>
     </div>

@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Send, Loader2 } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { ArrowUp, Loader2, Settings2 } from 'lucide-react'
 import type { Message } from '../lib/types'
 
 interface ChatPanelProps {
@@ -10,31 +10,38 @@ interface ChatPanelProps {
 
 export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps) {
   const [input, setInput] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
+  const scrollAnchorRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node) {
+        node.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      }
+    },
+    [messages.length, isLoading],
+  )
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault()
     if (input.trim() && !isLoading) {
       onSendMessage(input.trim())
       setInput('')
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
   return (
-    <div className="flex h-full flex-col bg-gray-50">
-      <div className="border-b border-gray-200 bg-white px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-900">Chat</h2>
+    <div className="flex h-full flex-col bg-transparent">
+      <div className="border-b border-gray-200 px-2 py-4">
+        <h2 className="text-base font-semibold text-gray-900">Chat</h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto px-2 py-4">
         {messages.length === 0 && (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -46,9 +53,12 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
           </div>
         )}
 
-        {messages.map((message) => (
+        {messages.map((message, index) => {
+          const isLastMessage = index === messages.length - 1
+          return (
           <div
             key={message.id}
+            ref={isLastMessage ? scrollAnchorRef : undefined}
             className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
@@ -61,38 +71,50 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
               <p className="whitespace-pre-wrap">{message.content}</p>
             </div>
           </div>
-        ))}
+        )
+        })}
 
         {isLoading && (
-          <div className="flex justify-start">
+          <div ref={scrollAnchorRef} className="flex justify-start">
             <div className="bg-white border border-gray-200 rounded-lg px-4 py-2">
               <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
             </div>
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-gray-200 bg-white p-4">
-        <div className="flex gap-2">
-          <input
-            type="text"
+      <div className="border-t border-gray-200 bg-transparent px-2 py-4">
+        <form
+          onSubmit={handleSubmit}
+          className="relative flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-sm focus-within:ring-1 focus-within:ring-gray-300"
+        >
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask for a visualization..."
-            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+            onKeyDown={handleKeyDown}
+            placeholder="Ask a follow up..."
+            className="min-h-[60px] w-full resize-none bg-transparent px-2 py-1 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
             disabled={isLoading}
           />
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className="rounded-lg bg-gray-900 px-4 py-2 text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
-          >
-            <Send className="h-5 w-5" />
-          </button>
-        </div>
-      </form>
+          <div className="flex items-center justify-between px-2">
+            <button
+              type="button"
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label="Settings"
+            >
+              <Settings2 className="h-4 w-4" />
+            </button>
+            <button
+              type="submit"
+              disabled={!input.trim() || isLoading}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-900 transition-colors hover:bg-gray-200 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-300"
+              aria-label="Send message"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { createAgent } from '../lib/agent'
 import type { UIElement } from '@json-render/core'
+import type { NestedUIElement } from '../lib/types'
 
 interface AgentMessage {
   role: string
@@ -17,7 +18,7 @@ interface ToolCall {
 function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
   for (const msg of messages) {
     // Check for tool_calls array (LangChain format)
-    const msgAny = msg as Record<string, unknown>
+    const msgAny = msg as unknown as Record<string, unknown>
     if (msgAny.tool_calls && Array.isArray(msgAny.tool_calls)) {
       for (const toolCall of msgAny.tool_calls as Array<{ name: string; args: Record<string, unknown> }>) {
         if (toolCall.name === 'render_ui' && toolCall.args?.ui) {
@@ -81,6 +82,12 @@ interface SendMessageInput {
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
 }
 
+export interface SendMessageResult {
+  success: boolean
+  response: string
+  ui: NestedUIElement | null
+}
+
 export const sendMessage = createServerFn({ method: 'POST' })
   .inputValidator((d: SendMessageInput) => d)
   .handler(async ({ data }) => {
@@ -96,14 +103,14 @@ export const sendMessage = createServerFn({ method: 'POST' })
 
     try {
       const result = await agent.invoke({ messages })
-      const agentMessages = result.messages as AgentMessage[]
+      const agentMessages = result.messages as unknown as AgentMessage[]
       const ui = extractUiFromMessages(agentMessages)
       const response = extractTextContent(agentMessages)
 
       return {
         success: true,
         response: response || "I've created the visualization for you.",
-        ui,
+        ui: (ui as NestedUIElement | null) ?? null,
       }
     } catch (error) {
       console.error('Agent error:', error)
