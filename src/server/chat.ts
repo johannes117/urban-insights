@@ -16,11 +16,14 @@ interface ToolCall {
 }
 
 function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
-  for (const msg of messages) {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex--) {
+    const msg = messages[messageIndex]
     // Check for tool_calls array (LangChain format)
     const msgAny = msg as unknown as Record<string, unknown>
     if (msgAny.tool_calls && Array.isArray(msgAny.tool_calls)) {
-      for (const toolCall of msgAny.tool_calls as Array<{ name: string; args: Record<string, unknown> }>) {
+      const toolCalls = msgAny.tool_calls as Array<{ name: string; args: Record<string, unknown> }>
+      for (let i = toolCalls.length - 1; i >= 0; i--) {
+        const toolCall = toolCalls[i]
         if (toolCall.name === 'render_ui' && toolCall.args?.ui) {
           return toolCall.args.ui as UIElement
         }
@@ -31,7 +34,9 @@ function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
     if (msgAny.additional_kwargs && typeof msgAny.additional_kwargs === 'object') {
       const kwargs = msgAny.additional_kwargs as Record<string, unknown>
       if (kwargs.tool_calls && Array.isArray(kwargs.tool_calls)) {
-        for (const toolCall of kwargs.tool_calls as Array<{ function?: { name: string; arguments: string } }>) {
+        const toolCalls = kwargs.tool_calls as Array<{ function?: { name: string; arguments: string } }>
+        for (let i = toolCalls.length - 1; i >= 0; i--) {
+          const toolCall = toolCalls[i]
           if (toolCall.function?.name === 'render_ui') {
             try {
               const args = JSON.parse(toolCall.function.arguments)
@@ -48,7 +53,8 @@ function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
 
     if (typeof msg.content === 'string') continue
 
-    for (const block of msg.content) {
+    for (let i = msg.content.length - 1; i >= 0; i--) {
+      const block = msg.content[i]
       if (block.type === 'tool_use' && block.name === 'render_ui') {
         const toolUse = block as unknown as ToolCall
         if (toolUse.args?.ui) {

@@ -13,10 +13,24 @@ export const Route = createFileRoute('/')({
 function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [currentUi, setCurrentUi] = useState<NestedUIElement | null>(null)
+  const [artifactState, setArtifactState] = useState<{
+    items: NestedUIElement[]
+    index: number
+  }>({ items: [], index: -1 })
   const [chatWidthPercent, setChatWidthPercent] = useState(33)
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
+
+  const currentUi =
+    artifactState.index >= 0 ? artifactState.items[artifactState.index] ?? null : null
+
+  const handleArtifactIndexChange = (nextIndex: number) => {
+    setArtifactState((prev) => {
+      if (prev.items.length === 0) return prev
+      const clamped = Math.min(prev.items.length - 1, Math.max(0, nextIndex))
+      return { ...prev, index: clamped }
+    })
+  }
 
   const handleSendMessage = async (content: string) => {
     const userMessage: Message = {
@@ -45,8 +59,12 @@ function App() {
 
       setMessages((prev) => [...prev, assistantMessage])
 
-      if (result.ui) {
-        setCurrentUi(result.ui)
+      const ui = result.ui
+      if (ui) {
+        setArtifactState((prev) => {
+          const items = [...prev.items, ui]
+          return { items, index: items.length - 1 }
+        })
       }
     } catch (error) {
       console.error('Failed to send message:', error)
@@ -103,6 +121,9 @@ function App() {
           ui={currentUi}
           onResizePointerDown={handlePointerDown}
           isResizing={isDragging}
+          artifactCount={artifactState.items.length}
+          artifactIndex={artifactState.index}
+          onArtifactIndexChange={handleArtifactIndexChange}
         />
       </div>
     </div>
