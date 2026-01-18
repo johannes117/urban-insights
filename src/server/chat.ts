@@ -15,15 +15,12 @@ interface ToolCall {
 }
 
 function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
-  console.log('All messages:', JSON.stringify(messages, null, 2))
-
   for (const msg of messages) {
     // Check for tool_calls array (LangChain format)
     const msgAny = msg as Record<string, unknown>
     if (msgAny.tool_calls && Array.isArray(msgAny.tool_calls)) {
       for (const toolCall of msgAny.tool_calls as Array<{ name: string; args: Record<string, unknown> }>) {
         if (toolCall.name === 'render_ui' && toolCall.args?.ui) {
-          console.log('Found UI in tool_calls:', toolCall.args.ui)
           return toolCall.args.ui as UIElement
         }
       }
@@ -38,7 +35,6 @@ function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
             try {
               const args = JSON.parse(toolCall.function.arguments)
               if (args.ui) {
-                console.log('Found UI in additional_kwargs:', args.ui)
                 return args.ui as UIElement
               }
             } catch (e) {
@@ -55,7 +51,6 @@ function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
       if (block.type === 'tool_use' && block.name === 'render_ui') {
         const toolUse = block as unknown as ToolCall
         if (toolUse.args?.ui) {
-          console.log('Found UI in content block:', toolUse.args.ui)
           return toolUse.args.ui as UIElement
         }
       }

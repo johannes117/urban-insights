@@ -1,17 +1,14 @@
 'use client'
 
-import { Suspense, lazy } from 'react'
 import { LayoutDashboard } from 'lucide-react'
 import type { NestedUIElement } from '../lib/types'
-
-const JsonRenderView = lazy(() => import('./JsonRenderView'))
+import JsonRenderView from './JsonRenderView'
 
 interface ArtifactPanelProps {
   ui: NestedUIElement | null
 }
 
 export function ArtifactPanel({ ui }: ArtifactPanelProps) {
-  console.log('ArtifactPanel received ui:', ui)
   return (
     <div className="flex h-full flex-col bg-white">
       <div className="border-b border-gray-200 px-4 py-3">
@@ -30,9 +27,7 @@ export function ArtifactPanel({ ui }: ArtifactPanelProps) {
             </div>
           </div>
         ) : (
-          <Suspense fallback={<div className="text-gray-400">Loading...</div>}>
-            <JsonRenderView ui={ui} />
-          </Suspense>
+          <JsonRenderView ui={ui} />
         )}
       </div>
     </div>

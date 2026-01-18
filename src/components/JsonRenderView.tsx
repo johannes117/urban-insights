@@ -46,10 +46,8 @@ function nestedToFlat(nested: NestedUIElement): UITree {
 
 export default function JsonRenderView({ ui }: JsonRenderViewProps) {
   const flatTree = nestedToFlat(ui)
-  console.log('Converted to flat tree:', flatTree)
 
   const handleAction = (actionName: string) => {
-    console.log('Action triggered:', actionName)
     if (actionName === 'refresh') {
       window.location.reload()
     }

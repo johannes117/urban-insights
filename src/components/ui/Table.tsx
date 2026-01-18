@@ -11,7 +11,7 @@ interface TableProps {
 
 export function Table({ element }: TableProps) {
   const { columns, dataPath } = element.props
-  const data = useData()
+  const { data } = useData()
 
   const pathParts = dataPath.replace(/^\//, '').split('/')
   let tableData = data as Record<string, unknown>

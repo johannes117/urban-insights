@@ -23,7 +23,7 @@ const COLORS = ['#111827', '#374151', '#6b7280', '#9ca3af', '#d1d5db']
 
 export function PieChart({ element }: PieChartProps) {
   const { title, dataPath, nameKey, valueKey } = element.props
-  const data = useData()
+  const { data } = useData()
 
   const pathParts = dataPath.replace(/^\//, '').split('/')
   let chartData = data as Record<string, unknown>

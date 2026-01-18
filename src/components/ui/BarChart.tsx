@@ -22,7 +22,7 @@ interface BarChartProps {
 
 export function BarChart({ element }: BarChartProps) {
   const { title, dataPath, xKey, yKey } = element.props
-  const data = useData()
+  const { data } = useData()
 
   const pathParts = dataPath.replace(/^\//, '').split('/')
   let chartData = data as Record<string, unknown>

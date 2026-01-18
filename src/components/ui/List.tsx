@@ -11,7 +11,7 @@ interface ListProps {
 
 export function List({ element }: ListProps) {
   const { dataPath, itemTemplate } = element.props
-  const data = useData()
+  const { data } = useData()
 
   const pathParts = dataPath.replace(/^\//, '').split('/')
   let listData = data as Record<string, unknown>

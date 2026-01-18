@@ -42,9 +42,7 @@ function App() {
 
       setMessages((prev) => [...prev, assistantMessage])
 
-      console.log('Result from server:', result)
       if (result.ui) {
-        console.log('Setting UI:', result.ui)
         setCurrentUi(result.ui)
       }
     } catch (error) {
