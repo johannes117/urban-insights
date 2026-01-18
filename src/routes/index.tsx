@@ -78,8 +78,7 @@ function App() {
     setIsDragging(true)
   }
 
-  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.releasePointerCapture(event.pointerId)
+  const handlePointerUp = () => {
     setIsDragging(false)
   }
 
@@ -92,24 +91,19 @@ function App() {
       onPointerLeave={handlePointerUp}
       onPointerCancel={handlePointerUp}
     >
-      <div className="min-w-0" style={{ width: `${chatWidthPercent}%` }}>
+      <div className="min-w-0 mr-6" style={{ width: `${chatWidthPercent}%` }}>
         <ChatPanel
           messages={messages}
           isLoading={isLoading}
           onSendMessage={handleSendMessage}
         />
       </div>
-      <div
-        className={`mx-3 w-1 cursor-col-resize rounded-full transition-colors ${
-          isDragging ? 'bg-gray-300' : 'bg-gray-200 hover:bg-gray-300'
-        }`}
-        onPointerDown={handlePointerDown}
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize panels"
-      />
       <div className="min-w-0 flex-1">
-        <ArtifactPanel ui={currentUi} />
+        <ArtifactPanel
+          ui={currentUi}
+          onResizePointerDown={handlePointerDown}
+          isResizing={isDragging}
+        />
       </div>
     </div>
   )
