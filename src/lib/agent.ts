@@ -1,5 +1,6 @@
 import { createDeepAgent } from 'deepagents'
 import { tool } from '@langchain/core/tools'
+import { ChatAnthropic } from '@langchain/anthropic'
 import { z } from 'zod/v3'
 import { mockData, type MockDataKey } from './mockData'
 
@@ -84,6 +85,10 @@ const renderUiTool = tool(
 
 export function createAgent() {
   return createDeepAgent({
+    model: new ChatAnthropic({
+      model: 'claude-sonnet-4-5-20250929',
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    }),
     systemPrompt,
     tools: [getDataTool, renderUiTool],
   })

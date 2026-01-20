@@ -22,7 +22,7 @@ const config = defineConfig({
     devtools(),
     nitro({
       externals: {
-        inline: ['@langchain/anthropic'],
+        inline: [/^@langchain\//],
       },
     }),
     viteTsConfigPaths({
