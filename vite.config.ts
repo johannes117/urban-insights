@@ -20,7 +20,11 @@ const config = defineConfig({
   plugins: [
     tailwindcss(),
     devtools(),
-    nitro(),
+    nitro({
+      externals: {
+        inline: ['@langchain/anthropic'],
+      },
+    }),
     viteTsConfigPaths({
       projects: ['./tsconfig.json'],
     }),
