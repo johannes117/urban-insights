@@ -18,6 +18,11 @@ export interface ChatState {
   isLoading: boolean
 }
 
+export interface QueryResult {
+  resultKey: string
+  data: unknown[]
+}
+
 export interface ComponentProps<T = Record<string, unknown>> {
   element: { type: string; props: T }
   children?: ReactNode

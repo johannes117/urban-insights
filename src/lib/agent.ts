@@ -4,6 +4,7 @@ import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatGroq } from '@langchain/groq'
 import { z } from 'zod/v3'
 import { mockData, type MockDataKey } from './mockData'
+import { datasetTools } from './datasetTools'
 
 function createModel() {
   if (process.env.GROQ_API_KEY) {
@@ -33,6 +34,14 @@ CRITICAL: When the user asks for ANY visualization, chart, graph, dashboard, or 
 2. Do NOT just describe what you would create - actually call the tool
 3. Keep your text response brief - the visualization speaks for itself
 
+WORKFLOW FOR DATABASE QUERIES:
+1. First call list_datasets to see available datasets
+2. Call get_dataset_schema to understand a dataset's structure and see sample data
+3. Use query_dataset to run SQL queries - provide a resultKey (e.g., "sales_data")
+4. Use that resultKey as dataPath in render_ui (e.g., dataPath: "/sales_data")
+
+You can run multiple queries with different resultKeys to combine data in one visualization.
+
 AVAILABLE COMPONENTS:
 - Card: Container with a title. Props: { title: string }. Can have children.
 - Metric: Display a KPI value. Props: { label: string, value: string, trend?: "up" | "down" | "flat" }
@@ -44,26 +53,20 @@ AVAILABLE COMPONENTS:
 - LineChart: Line chart. Props: { title: string, dataPath: string, xKey: string, yKey: string }
 - PieChart: Pie chart. Props: { title: string, dataPath: string, nameKey: string, valueKey: string }
 
-DATA PATHS:
-Data paths are JSON pointers to the data. Available data keys:
-- /monthlyRevenue - Monthly revenue data with { month, revenue }
-- /quarterlyGrowth - Quarterly growth with { quarter, growth }
-- /topProducts - Top products with { name, sales, revenue }
-- /userMetrics - User metrics object with totalUsers, activeUsers, etc.
-- /salesByRegion - Sales by region with { region, sales }
-- /recentOrders - Recent orders with { id, customer, amount, status }
-- /websiteTraffic - Website traffic with { day, visitors }
-- /categoryBreakdown - Category breakdown with { category, value }
+DEMO DATA (for testing without database):
+These paths have built-in demo data:
+- /monthlyRevenue - { month, revenue }
+- /quarterlyGrowth - { quarter, growth }
+- /topProducts - { name, sales, revenue }
+- /userMetrics - { totalUsers, activeUsers, etc. }
+- /salesByRegion - { region, sales }
+- /recentOrders - { id, customer, amount, status }
+- /websiteTraffic - { day, visitors }
+- /categoryBreakdown - { category, value }
 
-EXAMPLE UI OUTPUT:
-{
-  "type": "Grid",
-  "props": { "columns": 2 },
-  "children": [
-    { "type": "Metric", "props": { "label": "Total Revenue", "value": "$125,000", "trend": "up" } },
-    { "type": "BarChart", "props": { "title": "Monthly Revenue", "dataPath": "/monthlyRevenue", "xKey": "month", "yKey": "revenue" } }
-  ]
-}
+EXAMPLE - Using database data:
+1. query_dataset({ query: "SELECT month, revenue FROM dataset_sales ORDER BY month", resultKey: "monthly" })
+2. render_ui({ ui: { type: "BarChart", props: { title: "Revenue", dataPath: "/monthly", xKey: "month", yKey: "revenue" } } })
 
 IMPORTANT: Always call render_ui tool when creating visualizations. A brief text response + the tool call is the correct pattern.`
 
@@ -101,7 +104,7 @@ export function createAgent() {
   return createDeepAgent({
     model: createModel(),
     systemPrompt,
-    tools: [getDataTool, renderUiTool],
+    tools: [getDataTool, renderUiTool, ...datasetTools],
   })
 }
 
