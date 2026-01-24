@@ -59,27 +59,18 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
               <div
                 key={message.id}
                 ref={isLastMessage ? scrollAnchorRef : undefined}
-                className="flex justify-start"
               >
-                <div className="max-w-[80%] px-4">
-                  <ToolCallDisplay toolCall={message.toolCall} />
-                </div>
+                <ToolCallDisplay toolCall={message.toolCall} />
               </div>
             )
           }
 
-          return (
-            <div
-              key={message.id}
-              ref={isLastMessage ? scrollAnchorRef : undefined}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+          if (message.role === 'assistant') {
+            return (
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                  message.role === 'user'
-                    ? 'bg-gray-900 text-white'
-                    : 'bg-white border border-gray-200 text-gray-900'
-                }`}
+                key={message.id}
+                ref={isLastMessage ? scrollAnchorRef : undefined}
+                className="text-gray-900"
               >
                 {(message.content || isStreaming) && (
                   <p className="whitespace-pre-wrap">
@@ -89,6 +80,18 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
                     )}
                   </p>
                 )}
+              </div>
+            )
+          }
+
+          return (
+            <div
+              key={message.id}
+              ref={isLastMessage ? scrollAnchorRef : undefined}
+              className="flex justify-end"
+            >
+              <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-900 text-white">
+                <p className="whitespace-pre-wrap">{message.content}</p>
               </div>
             </div>
           )
