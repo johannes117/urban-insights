@@ -29,3 +29,7 @@ export interface ComponentProps<T = Record<string, unknown>> {
   children?: ReactNode
   data?: Record<string, unknown>
 }
+
+export type StreamChunk =
+  | { type: 'text'; content: string }
+  | { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[] }

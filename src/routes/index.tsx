@@ -2,8 +2,8 @@ import { useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
-import { sendMessage, type SendMessageResult } from '../server/chat'
-import type { Message, NestedUIElement, QueryResult } from '../lib/types'
+import { streamMessage } from '../server/chat'
+import type { Message, NestedUIElement, QueryResult, StreamChunk } from '../lib/types'
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -39,41 +39,65 @@ function App() {
       content,
     }
 
-    setMessages((prev) => [...prev, userMessage])
+    const assistantMessageId = crypto.randomUUID()
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+    }
+
+    setMessages((prev) => [...prev, userMessage, assistantMessage])
     setIsLoading(true)
 
     try {
-      const result = (await sendMessage({
+      const stream = await streamMessage({
         data: {
           message: content,
           history: messages.map((m) => ({ role: m.role, content: m.content })),
         },
-      })) as SendMessageResult
+      })
 
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: result.response,
-        ui: result.ui ?? undefined,
-      }
+      let accumulatedText = ''
 
-      setMessages((prev) => [...prev, assistantMessage])
+      for await (const chunk of stream) {
+        const typedChunk = chunk as StreamChunk
+        if (typedChunk.type === 'text') {
+          accumulatedText += typedChunk.content
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMessageId ? { ...m, content: accumulatedText } : m
+            )
+          )
+        } else if (typedChunk.type === 'done') {
+          const finalContent = accumulatedText || "I've created the visualization for you."
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMessageId
+                ? { ...m, content: finalContent, ui: typedChunk.ui ?? undefined }
+                : m
+            )
+          )
 
-      const ui = result.ui
-      if (ui) {
-        setArtifactState((prev) => {
-          const items = [...prev.items, { ui, queryResults: result.queryResults || [] }]
-          return { items, index: items.length - 1 }
-        })
+          if (typedChunk.ui) {
+            setArtifactState((prev) => {
+              const items = [
+                ...prev.items,
+                { ui: typedChunk.ui!, queryResults: typedChunk.queryResults || [] },
+              ]
+              return { items, index: items.length - 1 }
+            })
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to send message:', error)
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: 'Sorry, something went wrong. Please try again.',
-      }
-      setMessages((prev) => [...prev, errorMessage])
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMessageId
+            ? { ...m, content: 'Sorry, something went wrong. Please try again.' }
+            : m
+        )
+      )
     } finally {
       setIsLoading(false)
     }

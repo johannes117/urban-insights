@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { ArrowUp, Loader2, Settings2 } from 'lucide-react'
+import { ArrowUp, Settings2 } from 'lucide-react'
 import type { Message } from '../lib/types'
 
 interface ChatPanelProps {
@@ -51,6 +51,7 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
 
         {messages.map((message, index) => {
           const isLastMessage = index === messages.length - 1
+          const isStreaming = isLastMessage && isLoading && message.role === 'assistant'
           return (
           <div
             key={message.id}
@@ -64,19 +65,16 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
                   : 'bg-white border border-gray-200 text-gray-900'
               }`}
             >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <p className="whitespace-pre-wrap">
+                {message.content}
+                {isStreaming && (
+                  <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
+                )}
+              </p>
             </div>
           </div>
         )
         })}
-
-        {isLoading && (
-          <div ref={scrollAnchorRef} className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-lg px-4 py-2">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-            </div>
-          </div>
-        )}
       </div>
 
       <form

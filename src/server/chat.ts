@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { createAgent } from '../lib/agent'
 import type { UIElement } from '@json-render/core'
-import type { NestedUIElement, QueryResult } from '../lib/types'
+import type { NestedUIElement, QueryResult, StreamChunk } from '../lib/types'
 
 interface AgentMessage {
   role: string
@@ -169,5 +169,79 @@ export const sendMessage = createServerFn({ method: 'POST' })
         ui: null,
         queryResults: [],
       }
+    }
+  })
+
+function extractTextFromMessageChunk(messageChunk: unknown): string | null {
+  if (!messageChunk || typeof messageChunk !== 'object') return null
+
+  const msg = messageChunk as Record<string, unknown>
+  const content = msg.content
+
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (typeof block === 'string') return block
+      if (block && typeof block === 'object' && 'text' in block) {
+        return (block as { text: string }).text
+      }
+    }
+  }
+
+  return null
+}
+
+export const streamMessage = createServerFn({ method: 'POST' })
+  .inputValidator((d: SendMessageInput) => d)
+  .handler(async function* ({ data }): AsyncGenerator<StreamChunk> {
+    const agent = createAgent()
+
+    const messages = [
+      ...(data.history?.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })) ?? []),
+      { role: 'user' as const, content: data.message },
+    ]
+
+    try {
+      const stream = await agent.stream(
+        { messages },
+        { recursionLimit: 50, streamMode: ['messages', 'values'] as const }
+      )
+
+      let finalMessages: AgentMessage[] = []
+
+      for await (const chunk of stream) {
+        const [mode, chunkData] = chunk as [string, unknown]
+
+        if (mode === 'messages') {
+          const [messageChunk, metadata] = chunkData as [unknown, Record<string, unknown>]
+          const text = extractTextFromMessageChunk(messageChunk)
+          if (text) {
+            yield { type: 'text', content: text }
+          }
+        } else if (mode === 'values') {
+          const values = chunkData as { messages?: AgentMessage[] }
+          if (values.messages) {
+            finalMessages = values.messages
+          }
+        }
+      }
+
+      const ui = extractUiFromMessages(finalMessages)
+      const queryResults = extractQueryResults(finalMessages)
+
+      yield {
+        type: 'done',
+        ui: (ui as NestedUIElement | null) ?? null,
+        queryResults,
+      }
+    } catch (error) {
+      console.error('Agent streaming error:', error)
+      yield { type: 'done', ui: null, queryResults: [] }
     }
   })
