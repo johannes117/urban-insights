@@ -1,8 +1,22 @@
 import { createDeepAgent } from 'deepagents'
 import { tool } from '@langchain/core/tools'
 import { ChatAnthropic } from '@langchain/anthropic'
+import { ChatGroq } from '@langchain/groq'
 import { z } from 'zod/v3'
 import { mockData, type MockDataKey } from './mockData'
+
+function createModel() {
+  if (process.env.GROQ_API_KEY) {
+    return new ChatGroq({
+      model: 'moonshotai/kimi-k2-instruct-0905',
+      apiKey: process.env.GROQ_API_KEY,
+    })
+  }
+  return new ChatAnthropic({
+    model: 'claude-sonnet-4-5-20250929',
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  })
+}
 
 const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
   z.object({
@@ -85,10 +99,7 @@ const renderUiTool = tool(
 
 export function createAgent() {
   return createDeepAgent({
-    model: new ChatAnthropic({
-      model: 'claude-sonnet-4-5-20250929',
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    }),
+    model: createModel(),
     systemPrompt,
     tools: [getDataTool, renderUiTool],
   })
