@@ -53,37 +53,45 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
         {messages.map((message, index) => {
           const isLastMessage = index === messages.length - 1
           const isStreaming = isLastMessage && isLoading && message.role === 'assistant'
-          return (
-          <div
-            key={message.id}
-            ref={isLastMessage ? scrollAnchorRef : undefined}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                message.role === 'user'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white border border-gray-200 text-gray-900'
-              }`}
-            >
-              {message.toolCalls && message.toolCalls.length > 0 && (
-                <div className="mb-2">
-                  {message.toolCalls.map((tc) => (
-                    <ToolCallDisplay key={tc.id} toolCall={tc} />
-                  ))}
+
+          if (message.role === 'tool' && message.toolCall) {
+            return (
+              <div
+                key={message.id}
+                ref={isLastMessage ? scrollAnchorRef : undefined}
+                className="flex justify-start"
+              >
+                <div className="max-w-[80%] px-4">
+                  <ToolCallDisplay toolCall={message.toolCall} />
                 </div>
-              )}
-              {(message.content || isStreaming) && (
-                <p className="whitespace-pre-wrap">
-                  {message.content}
-                  {isStreaming && (
-                    <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
-                  )}
-                </p>
-              )}
+              </div>
+            )
+          }
+
+          return (
+            <div
+              key={message.id}
+              ref={isLastMessage ? scrollAnchorRef : undefined}
+              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                  message.role === 'user'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-white border border-gray-200 text-gray-900'
+                }`}
+              >
+                {(message.content || isStreaming) && (
+                  <p className="whitespace-pre-wrap">
+                    {message.content}
+                    {isStreaming && (
+                      <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
+                    )}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        )
+          )
         })}
       </div>
 

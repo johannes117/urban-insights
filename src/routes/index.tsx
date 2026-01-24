@@ -39,73 +39,92 @@ function App() {
       content,
     }
 
-    const assistantMessageId = crypto.randomUUID()
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-    }
-
-    setMessages((prev) => [...prev, userMessage, assistantMessage])
+    setMessages((prev) => [...prev, userMessage])
     setIsLoading(true)
 
     try {
       const stream = await streamMessage({
         data: {
           message: content,
-          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          history: messages
+            .filter((m) => m.role !== 'tool')
+            .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
         },
       })
 
-      let accumulatedText = ''
-      const toolCallsMap = new Map<string, ToolCall>()
+      let currentTextMessageId: string | null = null
+      let currentText = ''
+      const toolMessageIds = new Map<string, string>()
 
       for await (const chunk of stream) {
         const typedChunk = chunk as StreamChunk
+
         if (typedChunk.type === 'text') {
-          accumulatedText += typedChunk.content
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMessageId ? { ...m, content: accumulatedText } : m
+          if (!currentTextMessageId) {
+            currentTextMessageId = crypto.randomUUID()
+            currentText = typedChunk.content
+            setMessages((prev) => [
+              ...prev,
+              { id: currentTextMessageId!, role: 'assistant', content: currentText },
+            ])
+          } else {
+            currentText += typedChunk.content
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === currentTextMessageId ? { ...m, content: currentText } : m
+              )
             )
-          )
+          }
         } else if (typedChunk.type === 'tool_start') {
+          currentTextMessageId = null
+          currentText = ''
+
+          const toolMessageId = crypto.randomUUID()
+          toolMessageIds.set(typedChunk.toolCallId, toolMessageId)
+
           const toolCall: ToolCall = {
             id: typedChunk.toolCallId,
             name: typedChunk.name,
             args: typedChunk.args,
             status: 'running',
           }
-          toolCallsMap.set(typedChunk.toolCallId, toolCall)
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMessageId
-                ? { ...m, toolCalls: Array.from(toolCallsMap.values()) }
-                : m
-            )
-          )
+
+          setMessages((prev) => [
+            ...prev,
+            { id: toolMessageId, role: 'tool', content: '', toolCall },
+          ])
         } else if (typedChunk.type === 'tool_end') {
-          const existing = toolCallsMap.get(typedChunk.toolCallId)
-          if (existing) {
-            existing.status = 'complete'
-            existing.result = typedChunk.result
+          const toolMessageId = toolMessageIds.get(typedChunk.toolCallId)
+          if (toolMessageId) {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === assistantMessageId
-                  ? { ...m, toolCalls: Array.from(toolCallsMap.values()) }
+                m.id === toolMessageId && m.toolCall
+                  ? {
+                      ...m,
+                      toolCall: { ...m.toolCall, status: 'complete', result: typedChunk.result },
+                    }
                   : m
               )
             )
           }
         } else if (typedChunk.type === 'done') {
-          const finalContent = accumulatedText || "I've created the visualization for you."
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMessageId
-                ? { ...m, content: finalContent, ui: typedChunk.ui ?? undefined }
-                : m
+          if (!currentTextMessageId && currentText === '') {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: 'assistant',
+                content: "I've created the visualization for you.",
+                ui: typedChunk.ui ?? undefined,
+              },
+            ])
+          } else if (currentTextMessageId && typedChunk.ui) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === currentTextMessageId ? { ...m, ui: typedChunk.ui ?? undefined } : m
+              )
             )
-          )
+          }
 
           if (typedChunk.ui) {
             setArtifactState((prev) => {
@@ -120,13 +139,14 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to send message:', error)
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMessageId
-            ? { ...m, content: 'Sorry, something went wrong. Please try again.' }
-            : m
-        )
-      )
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'Sorry, something went wrong. Please try again.',
+        },
+      ])
     } finally {
       setIsLoading(false)
     }

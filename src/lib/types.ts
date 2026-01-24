@@ -16,10 +16,10 @@ export interface ToolCall {
 
 export interface Message {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'tool'
   content: string
   ui?: NestedUIElement
-  toolCalls?: ToolCall[]
+  toolCall?: ToolCall
 }
 
 export interface ChatState {
