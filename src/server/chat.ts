@@ -1,11 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
 import { createAgent } from '../lib/agent'
 import type { UIElement } from '@json-render/core'
-import type { NestedUIElement } from '../lib/types'
+import type { NestedUIElement, QueryResult } from '../lib/types'
 
 interface AgentMessage {
   role: string
   content: string | Array<{ type: string; tool_use_id?: string; content?: string; name?: string; input?: unknown }>
+  [key: string]: unknown
 }
 
 interface ToolCall {
@@ -15,11 +16,6 @@ interface ToolCall {
     query?: string
     resultKey?: string
   }
-}
-
-interface QueryResult {
-  resultKey: string
-  data: unknown[]
 }
 
 function extractUiFromMessages(messages: AgentMessage[]): UIElement | null {
@@ -95,7 +91,7 @@ function extractQueryResults(messages: AgentMessage[]): QueryResult[] {
 
   for (const msg of messages) {
     if (typeof msg.content === 'string') {
-      if (msg.role === 'tool' || (msg as Record<string, unknown>).type === 'tool') {
+      if (msg.role === 'tool' || msg.type === 'tool') {
         try {
           const parsed = JSON.parse(msg.content)
           if (parsed.success && parsed.resultKey && parsed.data) {
@@ -153,7 +149,7 @@ export const sendMessage = createServerFn({ method: 'POST' })
     ]
 
     try {
-      const result = await agent.invoke({ messages })
+      const result = await agent.invoke({ messages }, { recursionLimit: 50 })
       const agentMessages = result.messages as unknown as AgentMessage[]
       const ui = extractUiFromMessages(agentMessages)
       const response = extractTextContent(agentMessages)

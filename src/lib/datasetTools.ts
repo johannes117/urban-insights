@@ -2,9 +2,9 @@ import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
 import { db, datasets } from '../db'
 import { eq } from 'drizzle-orm'
-import { neon } from '@neondatabase/serverless'
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
 
-function getSql() {
+function getSql(): NeonQueryFunction<false, false> {
   return neon(process.env.DATABASE_URL!)
 }
 
@@ -69,7 +69,7 @@ export const getDatasetSchemaTool = tool(
     }
 
     const sql = getSql()
-    const result = await sql.query(`SELECT * FROM "${dataset.tableName}" LIMIT 10`, [])
+    const sampleRows = await sql.query(`SELECT * FROM "${dataset.tableName}" LIMIT 10`, [])
 
     return JSON.stringify({
       name: dataset.name,
@@ -77,7 +77,7 @@ export const getDatasetSchemaTool = tool(
       tableName: dataset.tableName,
       totalRows: dataset.rowCount,
       columns: dataset.columns,
-      sampleRows: result.rows,
+      sampleRows,
     })
   },
   {
@@ -117,8 +117,7 @@ export const queryDatasetTool = tool(
 
     try {
       const sql = getSql()
-      const result = await sql.query(query, [])
-      const rows = result.rows || []
+      const rows = await sql.query(query, [])
 
       return JSON.stringify({
         success: true,

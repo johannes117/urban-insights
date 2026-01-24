@@ -20,7 +20,8 @@ export interface ChatState {
 
 export interface QueryResult {
   resultKey: string
-  data: unknown[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Record<string, any>[]
 }
 
 export interface ComponentProps<T = Record<string, unknown>> {

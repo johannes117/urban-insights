@@ -93,16 +93,13 @@ export const deleteDataset = createServerFn({ method: 'POST' })
   .inputValidator((d: { password: string; id: string }) => d)
   .handler(async ({ data }) => {
     requireAuth(data.password)
-    console.log('[Admin] Deleting dataset:', data.id)
 
     const [dataset] = await db.select().from(datasets).where(eq(datasets.id, data.id))
     if (!dataset) throw new Error('Dataset not found')
 
-    console.log('[Admin] Dropping table:', dataset.tableName)
     await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${dataset.tableName}"`))
     await db.delete(datasets).where(eq(datasets.id, data.id))
 
-    console.log('[Admin] Dataset deleted successfully')
     return { success: true }
   })
 
@@ -153,7 +150,6 @@ export const uploadDataset = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     requireAuth(data.password)
-    console.log('[Admin] Starting upload for:', data.name)
 
     const parsed = Papa.parse<Record<string, string>>(data.csvContent, {
       header: true,
@@ -161,24 +157,19 @@ export const uploadDataset = createServerFn({ method: 'POST' })
     })
 
     if (parsed.errors.length > 0) {
-      console.error('[Admin] CSV parse error:', parsed.errors[0])
       throw new Error(`CSV parsing error: ${parsed.errors[0].message}`)
     }
 
     const tableName = sanitizeTableName(data.name)
-    console.log('[Admin] Table name:', tableName, 'Rows:', parsed.data.length)
-
     const sql = getSql()
 
     const columnDefs = data.columns
       .map((col) => `"${col.name.replace(/"/g, '""')}" ${getPgType(col.type)}`)
       .join(', ')
 
-    console.log('[Admin] Creating table with columns:', columnDefs)
     await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${tableName}"`))
     await db.execute(drizzleSql.raw(`CREATE TABLE "${tableName}" (id SERIAL PRIMARY KEY, ${columnDefs})`))
 
-    console.log('[Admin] Inserting', parsed.data.length, 'rows...')
     const batchSize = 100
     for (let i = 0; i < parsed.data.length; i += batchSize) {
       const batch = parsed.data.slice(i, i + batchSize)
@@ -193,7 +184,6 @@ export const uploadDataset = createServerFn({ method: 'POST' })
       }
     }
 
-    console.log('[Admin] Saving dataset metadata...')
     const [dataset] = await db
       .insert(datasets)
       .values({
@@ -205,7 +195,6 @@ export const uploadDataset = createServerFn({ method: 'POST' })
       })
       .returning()
 
-    console.log('[Admin] Upload complete:', dataset.id)
     return dataset
   })
 
@@ -213,7 +202,6 @@ export const getDatasetPreview = createServerFn({ method: 'POST' })
   .inputValidator((d: { password: string; id: string }) => d)
   .handler(async ({ data }) => {
     requireAuth(data.password)
-    console.log('[Admin] Getting preview for dataset:', data.id)
 
     const [dataset] = await db.select().from(datasets).where(eq(datasets.id, data.id))
     if (!dataset) throw new Error('Dataset not found')
@@ -221,10 +209,9 @@ export const getDatasetPreview = createServerFn({ method: 'POST' })
     const sql = getSql()
     const rows = await sql.query(`SELECT * FROM "${dataset.tableName}" LIMIT 10`, [])
 
-    console.log('[Admin] Preview rows:', rows.rows?.length || 0)
     return {
       dataset,
-      rows: rows.rows || [],
+      rows,
     }
   })
 
