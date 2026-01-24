@@ -39,8 +39,8 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
   }
 
   return (
-    <div className="relative flex h-full flex-col bg-transparent">
-      <div className="flex-1 space-y-4 overflow-y-auto px-2 pb-36 pt-4">
+    <div className="flex h-full flex-col bg-transparent">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 py-4">
         {messages.length === 0 && (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -102,7 +102,7 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
 
       <form
         onSubmit={handleSubmit}
-        className="absolute bottom-4 left-2 right-2 z-10 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-lg focus-within:ring-1 focus-within:ring-gray-300"
+        className="mt-4 shrink-0 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-lg focus-within:ring-1 focus-within:ring-gray-300"
       >
         <textarea
           value={input}
