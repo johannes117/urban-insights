@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react'
-import { ArrowUp, Loader2, Settings2 } from 'lucide-react'
+import { ArrowUp, Settings2 } from 'lucide-react'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { Message } from '../lib/types'
+import { ToolCallDisplay } from './ToolCallDisplay'
 
 interface ChatPanelProps {
   messages: Message[]
@@ -36,8 +39,8 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
   }
 
   return (
-    <div className="relative flex h-full flex-col bg-transparent">
-      <div className="flex-1 space-y-4 overflow-y-auto px-2 pb-36 pt-4">
+    <div className="flex h-full flex-col bg-transparent">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 py-4">
         {messages.length === 0 && (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
@@ -51,37 +54,55 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
 
         {messages.map((message, index) => {
           const isLastMessage = index === messages.length - 1
-          return (
-          <div
-            key={message.id}
-            ref={isLastMessage ? scrollAnchorRef : undefined}
-            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                message.role === 'user'
-                  ? 'bg-gray-900 text-white'
-                  : 'bg-white border border-gray-200 text-gray-900'
-              }`}
-            >
-              <p className="whitespace-pre-wrap">{message.content}</p>
-            </div>
-          </div>
-        )
-        })}
+          const isStreaming = isLastMessage && isLoading && message.role === 'assistant'
 
-        {isLoading && (
-          <div ref={scrollAnchorRef} className="flex justify-start">
-            <div className="bg-white border border-gray-200 rounded-lg px-4 py-2">
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+          if (message.role === 'tool' && message.toolCall) {
+            return (
+              <div
+                key={message.id}
+                ref={isLastMessage ? scrollAnchorRef : undefined}
+              >
+                <ToolCallDisplay toolCall={message.toolCall} />
+              </div>
+            )
+          }
+
+          if (message.role === 'assistant') {
+            return (
+              <div
+                key={message.id}
+                ref={isLastMessage ? scrollAnchorRef : undefined}
+                className="text-gray-900 prose prose-sm prose-gray max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-strong:text-gray-900"
+              >
+                {(message.content || isStreaming) && (
+                  <>
+                    <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
+                    {isStreaming && (
+                      <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
+                    )}
+                  </>
+                )}
+              </div>
+            )
+          }
+
+          return (
+            <div
+              key={message.id}
+              ref={isLastMessage ? scrollAnchorRef : undefined}
+              className="flex justify-end"
+            >
+              <div className="max-w-[80%] rounded-lg px-4 py-2 bg-gray-900 text-white">
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })}
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="absolute bottom-4 left-2 right-2 z-10 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-lg focus-within:ring-1 focus-within:ring-gray-300"
+        className="mt-4 shrink-0 flex flex-col gap-2 rounded-xl border border-gray-200 bg-white p-3 shadow-lg focus-within:ring-1 focus-within:ring-gray-300"
       >
         <textarea
           value={input}

@@ -3,7 +3,6 @@ import { tool } from '@langchain/core/tools'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatGroq } from '@langchain/groq'
 import { z } from 'zod/v3'
-import { mockData, type MockDataKey } from './mockData'
 import { datasetTools } from './datasetTools'
 
 function createModel() {
@@ -34,11 +33,21 @@ CRITICAL: When the user asks for ANY visualization, chart, graph, dashboard, or 
 2. Do NOT just describe what you would create - actually call the tool
 3. Keep your text response brief - the visualization speaks for itself
 
-WORKFLOW FOR DATABASE QUERIES:
-1. First call list_datasets to see available datasets
-2. Call get_dataset_schema to understand a dataset's structure and see sample data
-3. Use query_dataset to run SQL queries - provide a resultKey (e.g., "sales_data")
-4. Use that resultKey as dataPath in render_ui (e.g., dataPath: "/sales_data")
+MANDATORY WORKFLOW FOR DATABASE QUERIES:
+You MUST follow this exact sequence - never skip steps:
+
+1. FIRST: Call get_dataset_schema to get the EXACT table name and column names
+   - The schema response contains the precise column names you must use
+   - NEVER guess or assume column names - always check schema first
+
+2. THEN: Use query_dataset with the EXACT names from the schema
+   - Use the exact table name returned by get_dataset_schema
+   - Use the exact column names - they may have underscores, prefixes, or different casing
+   - Provide a resultKey (e.g., "sales_data") for storing results
+
+3. FINALLY: Call render_ui using that resultKey as dataPath (e.g., dataPath: "/sales_data")
+
+IMPORTANT: If a query fails, check the schema again. Column names in this database often differ from what you might expect. Always verify against the schema before retrying.
 
 You can run multiple queries with different resultKeys to combine data in one visualization.
 
@@ -53,39 +62,16 @@ AVAILABLE COMPONENTS:
 - LineChart: Line chart. Props: { title: string, dataPath: string, xKey: string, yKey: string }
 - PieChart: Pie chart. Props: { title: string, dataPath: string, nameKey: string, valueKey: string }
 
-DEMO DATA (for testing without database):
-These paths have built-in demo data:
-- /monthlyRevenue - { month, revenue }
-- /quarterlyGrowth - { quarter, growth }
-- /topProducts - { name, sales, revenue }
-- /userMetrics - { totalUsers, activeUsers, etc. }
-- /salesByRegion - { region, sales }
-- /recentOrders - { id, customer, amount, status }
-- /websiteTraffic - { day, visitors }
-- /categoryBreakdown - { category, value }
-
 EXAMPLE - Using database data:
-1. query_dataset({ query: "SELECT month, revenue FROM dataset_sales ORDER BY month", resultKey: "monthly" })
-2. render_ui({ ui: { type: "BarChart", props: { title: "Revenue", dataPath: "/monthly", xKey: "month", yKey: "revenue" } } })
+1. get_dataset_schema({ datasetName: "dataset_sales" }) -> Returns columns: ["sale_month", "total_revenue", "region"]
+2. query_dataset({ query: "SELECT sale_month, total_revenue FROM dataset_sales ORDER BY sale_month", resultKey: "monthly" })
+3. render_ui({ ui: { type: "BarChart", props: { title: "Revenue", dataPath: "/monthly", xKey: "sale_month", yKey: "total_revenue" } } })
 
-IMPORTANT: Always call render_ui tool when creating visualizations. A brief text response + the tool call is the correct pattern.`
+Note: The column names came from the schema (sale_month, total_revenue) - never assume column names like "month" or "revenue".
 
-const getDataTool = tool(
-  async ({ dataKey }) => {
-    const data = mockData[dataKey as MockDataKey]
-    if (!data) {
-      return JSON.stringify({ error: `Data key "${dataKey}" not found. Available keys: ${Object.keys(mockData).join(', ')}` })
-    }
-    return JSON.stringify(data)
-  },
-  {
-    name: 'get_data',
-    description: 'Get data for visualizations. Available keys: monthlyRevenue, quarterlyGrowth, topProducts, userMetrics, salesByRegion, recentOrders, websiteTraffic, categoryBreakdown',
-    schema: z.object({
-      dataKey: z.string().describe('The key of the data to retrieve'),
-    }),
-  }
-)
+IMPORTANT: Always call render_ui tool when creating visualizations. A brief text response + the tool call is the correct pattern.
+
+STYLE: Never use emojis in your responses. Keep text professional and clean.`
 
 const renderUiTool = tool(
   async ({ ui }) => {
@@ -104,7 +90,7 @@ export function createAgent() {
   return createDeepAgent({
     model: createModel(),
     systemPrompt,
-    tools: [getDataTool, renderUiTool, ...datasetTools],
+    tools: [renderUiTool, ...datasetTools],
   })
 }
 

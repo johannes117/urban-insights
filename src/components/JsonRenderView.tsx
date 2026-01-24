@@ -4,7 +4,6 @@ import { useMemo } from 'react'
 import { Renderer, DataProvider, ActionProvider, VisibilityProvider } from '@json-render/react'
 import type { UITree, UIElement } from '@json-render/core'
 import { componentRegistry } from './ui/registry'
-import { mockData } from '../lib/mockData'
 import type { NestedUIElement, QueryResult } from '../lib/types'
 
 interface JsonRenderViewProps {
@@ -50,7 +49,7 @@ export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderView
   const flatTree = nestedToFlat(ui)
 
   const data = useMemo(() => {
-    const merged = { ...mockData } as Record<string, unknown>
+    const merged: Record<string, unknown> = {}
     for (const result of queryResults) {
       merged[result.resultKey] = result.data
     }

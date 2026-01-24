@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { createAgent } from '../lib/agent'
 import type { UIElement } from '@json-render/core'
-import type { NestedUIElement, QueryResult } from '../lib/types'
+import type { NestedUIElement, QueryResult, StreamChunk } from '../lib/types'
 
 interface AgentMessage {
   role: string
@@ -169,5 +169,174 @@ export const sendMessage = createServerFn({ method: 'POST' })
         ui: null,
         queryResults: [],
       }
+    }
+  })
+
+function extractTextFromMessageChunk(messageChunk: unknown): string | null {
+  if (!messageChunk || typeof messageChunk !== 'object') return null
+
+  const msg = messageChunk as Record<string, unknown>
+  const content = msg.content
+
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (typeof block === 'string') return block
+      if (block && typeof block === 'object' && 'text' in block) {
+        return (block as { text: string }).text
+      }
+    }
+  }
+
+  return null
+}
+
+interface LangChainToolCall {
+  id?: string
+  name: string
+  args: Record<string, unknown>
+}
+
+function extractToolCallsFromMessage(
+  messageChunk: unknown
+): LangChainToolCall[] {
+  if (!messageChunk || typeof messageChunk !== 'object') return []
+
+  const msg = messageChunk as Record<string, unknown>
+
+  if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+    return msg.tool_calls as LangChainToolCall[]
+  }
+
+  if (msg.additional_kwargs && typeof msg.additional_kwargs === 'object') {
+    const kwargs = msg.additional_kwargs as Record<string, unknown>
+    if (kwargs.tool_calls && Array.isArray(kwargs.tool_calls)) {
+      return (kwargs.tool_calls as Array<{ id?: string; function?: { name: string; arguments: string } }>)
+        .filter((tc) => tc.function)
+        .map((tc) => ({
+          id: tc.id,
+          name: tc.function!.name,
+          args: JSON.parse(tc.function!.arguments || '{}'),
+        }))
+    }
+  }
+
+  return []
+}
+
+function isToolMessage(messageChunk: unknown): { toolCallId: string; content: string } | null {
+  if (!messageChunk || typeof messageChunk !== 'object') return null
+
+  const msg = messageChunk as Record<string, unknown>
+  const msgType = msg.type || msg._type || (msg.constructor as { name?: string })?.name
+
+  if (
+    (msgType === 'tool' || msg.role === 'tool' || msgType === 'ToolMessage' || msgType === 'ToolMessageChunk') &&
+    msg.tool_call_id &&
+    typeof msg.content === 'string'
+  ) {
+    return {
+      toolCallId: msg.tool_call_id as string,
+      content: msg.content,
+    }
+  }
+
+  return null
+}
+
+export const streamMessage = createServerFn({ method: 'POST' })
+  .inputValidator((d: SendMessageInput) => d)
+  .handler(async function* ({ data }): AsyncGenerator<StreamChunk> {
+    const agent = createAgent()
+
+    const messages = [
+      ...(data.history?.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      })) ?? []),
+      { role: 'user' as const, content: data.message },
+    ]
+
+    try {
+      const stream = await agent.stream(
+        { messages },
+        { recursionLimit: 50, streamMode: ['messages', 'values'] as const }
+      )
+
+      let finalMessages: AgentMessage[] = []
+      const seenToolCalls = new Set<string>()
+      const pendingToolCalls = new Map<string, { name: string; args: Record<string, unknown> }>()
+
+      for await (const chunk of stream) {
+        const [mode, chunkData] = chunk as [string, unknown]
+
+        if (mode === 'messages') {
+          const [messageChunk, metadata] = chunkData as [unknown, Record<string, unknown>]
+
+          const toolCalls = extractToolCallsFromMessage(messageChunk)
+          for (const tc of toolCalls) {
+            const toolCallId = tc.id || `${tc.name}-${Date.now()}`
+            if (!seenToolCalls.has(toolCallId)) {
+              seenToolCalls.add(toolCallId)
+              pendingToolCalls.set(toolCallId, { name: tc.name, args: tc.args })
+              yield {
+                type: 'tool_start',
+                toolCallId,
+                name: tc.name,
+                args: tc.args,
+              }
+            }
+          }
+
+          const toolResult = isToolMessage(messageChunk)
+          if (toolResult) {
+            const pending = pendingToolCalls.get(toolResult.toolCallId)
+            if (pending) {
+              pendingToolCalls.delete(toolResult.toolCallId)
+              let parsedResult: unknown = toolResult.content
+              try {
+                parsedResult = JSON.parse(toolResult.content)
+              } catch {
+                // keep as string
+              }
+              yield {
+                type: 'tool_end',
+                toolCallId: toolResult.toolCallId,
+                result: parsedResult,
+              }
+            }
+            continue
+          }
+
+          if (toolCalls.length > 0) {
+            continue
+          }
+
+          const text = extractTextFromMessageChunk(messageChunk)
+          if (text) {
+            yield { type: 'text', content: text }
+          }
+        } else if (mode === 'values') {
+          const values = chunkData as { messages?: AgentMessage[] }
+          if (values.messages) {
+            finalMessages = values.messages
+          }
+        }
+      }
+
+      const ui = extractUiFromMessages(finalMessages)
+      const queryResults = extractQueryResults(finalMessages)
+
+      yield {
+        type: 'done',
+        ui: (ui as NestedUIElement | null) ?? null,
+        queryResults,
+      }
+    } catch (error) {
+      console.error('Agent streaming error:', error)
+      yield { type: 'done', ui: null, queryResults: [] }
     }
   })
