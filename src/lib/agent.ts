@@ -68,7 +68,9 @@ EXAMPLE - Using database data:
 1. query_dataset({ query: "SELECT month, revenue FROM dataset_sales ORDER BY month", resultKey: "monthly" })
 2. render_ui({ ui: { type: "BarChart", props: { title: "Revenue", dataPath: "/monthly", xKey: "month", yKey: "revenue" } } })
 
-IMPORTANT: Always call render_ui tool when creating visualizations. A brief text response + the tool call is the correct pattern.`
+IMPORTANT: Always call render_ui tool when creating visualizations. A brief text response + the tool call is the correct pattern.
+
+STYLE: Never use emojis in your responses. Keep text professional and clean.`
 
 const getDataTool = tool(
   async ({ dataKey }) => {
