@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
 import { ArrowUp, Settings2 } from 'lucide-react'
+import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { Message } from '../lib/types'
 import { ToolCallDisplay } from './ToolCallDisplay'
 
@@ -70,15 +72,15 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
               <div
                 key={message.id}
                 ref={isLastMessage ? scrollAnchorRef : undefined}
-                className="text-gray-900"
+                className="text-gray-900 prose prose-sm prose-gray max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 prose-strong:text-gray-900"
               >
                 {(message.content || isStreaming) && (
-                  <p className="whitespace-pre-wrap">
-                    {message.content}
+                  <>
+                    <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
                     {isStreaming && (
                       <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
                     )}
-                  </p>
+                  </>
                 )}
               </div>
             )
