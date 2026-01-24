@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
 import { streamMessage } from '../server/chat'
-import type { Message, NestedUIElement, QueryResult, StreamChunk } from '../lib/types'
+import type { Message, NestedUIElement, QueryResult, StreamChunk, ToolCall } from '../lib/types'
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -58,6 +58,7 @@ function App() {
       })
 
       let accumulatedText = ''
+      const toolCallsMap = new Map<string, ToolCall>()
 
       for await (const chunk of stream) {
         const typedChunk = chunk as StreamChunk
@@ -68,6 +69,34 @@ function App() {
               m.id === assistantMessageId ? { ...m, content: accumulatedText } : m
             )
           )
+        } else if (typedChunk.type === 'tool_start') {
+          const toolCall: ToolCall = {
+            id: typedChunk.toolCallId,
+            name: typedChunk.name,
+            args: typedChunk.args,
+            status: 'running',
+          }
+          toolCallsMap.set(typedChunk.toolCallId, toolCall)
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMessageId
+                ? { ...m, toolCalls: Array.from(toolCallsMap.values()) }
+                : m
+            )
+          )
+        } else if (typedChunk.type === 'tool_end') {
+          const existing = toolCallsMap.get(typedChunk.toolCallId)
+          if (existing) {
+            existing.status = 'complete'
+            existing.result = typedChunk.result
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMessageId
+                  ? { ...m, toolCalls: Array.from(toolCallsMap.values()) }
+                  : m
+              )
+            )
+          }
         } else if (typedChunk.type === 'done') {
           const finalContent = accumulatedText || "I've created the visualization for you."
           setMessages((prev) =>

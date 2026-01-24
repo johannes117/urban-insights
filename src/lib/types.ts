@@ -6,11 +6,20 @@ export interface NestedUIElement {
   children?: NestedUIElement[]
 }
 
+export interface ToolCall {
+  id: string
+  name: string
+  args: Record<string, unknown>
+  result?: unknown
+  status: 'pending' | 'running' | 'complete'
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   ui?: NestedUIElement
+  toolCalls?: ToolCall[]
 }
 
 export interface ChatState {
@@ -32,4 +41,6 @@ export interface ComponentProps<T = Record<string, unknown>> {
 
 export type StreamChunk =
   | { type: 'text'; content: string }
+  | { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, unknown> }
+  | { type: 'tool_end'; toolCallId: string; result: unknown }
   | { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[] }

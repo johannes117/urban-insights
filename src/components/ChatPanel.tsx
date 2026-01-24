@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { ArrowUp, Settings2 } from 'lucide-react'
 import type { Message } from '../lib/types'
+import { ToolCallDisplay } from './ToolCallDisplay'
 
 interface ChatPanelProps {
   messages: Message[]
@@ -65,12 +66,21 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
                   : 'bg-white border border-gray-200 text-gray-900'
               }`}
             >
-              <p className="whitespace-pre-wrap">
-                {message.content}
-                {isStreaming && (
-                  <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
-                )}
-              </p>
+              {message.toolCalls && message.toolCalls.length > 0 && (
+                <div className="mb-2">
+                  {message.toolCalls.map((tc) => (
+                    <ToolCallDisplay key={tc.id} toolCall={tc} />
+                  ))}
+                </div>
+              )}
+              {(message.content || isStreaming) && (
+                <p className="whitespace-pre-wrap">
+                  {message.content}
+                  {isStreaming && (
+                    <span className="inline-block w-2 h-4 ml-0.5 bg-gray-400 animate-pulse" />
+                  )}
+                </p>
+              )}
             </div>
           </div>
         )
