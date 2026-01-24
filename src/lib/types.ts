@@ -18,6 +18,12 @@ export interface ChatState {
   isLoading: boolean
 }
 
+export interface QueryResult {
+  resultKey: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: Record<string, any>[]
+}
+
 export interface ComponentProps<T = Record<string, unknown>> {
   element: { type: string; props: T }
   children?: ReactNode

@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
 import { sendMessage, type SendMessageResult } from '../server/chat'
-import type { Message, NestedUIElement } from '../lib/types'
+import type { Message, NestedUIElement, QueryResult } from '../lib/types'
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -14,14 +14,14 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [artifactState, setArtifactState] = useState<{
-    items: NestedUIElement[]
+    items: Array<{ ui: NestedUIElement; queryResults: QueryResult[] }>
     index: number
   }>({ items: [], index: -1 })
   const [chatWidthPercent, setChatWidthPercent] = useState(33)
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
-  const currentUi =
+  const currentArtifact =
     artifactState.index >= 0 ? artifactState.items[artifactState.index] ?? null : null
 
   const handleArtifactIndexChange = (nextIndex: number) => {
@@ -62,7 +62,7 @@ function App() {
       const ui = result.ui
       if (ui) {
         setArtifactState((prev) => {
-          const items = [...prev.items, ui]
+          const items = [...prev.items, { ui, queryResults: result.queryResults || [] }]
           return { items, index: items.length - 1 }
         })
       }
@@ -118,7 +118,8 @@ function App() {
       </div>
       <div className="min-w-0 flex-1">
         <ArtifactPanel
-          ui={currentUi}
+          ui={currentArtifact?.ui ?? null}
+          queryResults={currentArtifact?.queryResults ?? []}
           onResizePointerDown={handlePointerDown}
           isResizing={isDragging}
           artifactCount={artifactState.items.length}

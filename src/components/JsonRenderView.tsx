@@ -1,13 +1,15 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Renderer, DataProvider, ActionProvider, VisibilityProvider } from '@json-render/react'
 import type { UITree, UIElement } from '@json-render/core'
 import { componentRegistry } from './ui/registry'
 import { mockData } from '../lib/mockData'
-import type { NestedUIElement } from '../lib/types'
+import type { NestedUIElement, QueryResult } from '../lib/types'
 
 interface JsonRenderViewProps {
   ui: NestedUIElement
+  queryResults?: QueryResult[]
 }
 
 function nestedToFlat(nested: NestedUIElement): UITree {
@@ -44,8 +46,16 @@ function nestedToFlat(nested: NestedUIElement): UITree {
   }
 }
 
-export default function JsonRenderView({ ui }: JsonRenderViewProps) {
+export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderViewProps) {
   const flatTree = nestedToFlat(ui)
+
+  const data = useMemo(() => {
+    const merged = { ...mockData } as Record<string, unknown>
+    for (const result of queryResults) {
+      merged[result.resultKey] = result.data
+    }
+    return merged
+  }, [queryResults])
 
   const handleAction = (actionName: string) => {
     if (actionName === 'refresh') {
@@ -57,7 +67,7 @@ export default function JsonRenderView({ ui }: JsonRenderViewProps) {
   }
 
   return (
-    <DataProvider initialData={mockData}>
+    <DataProvider initialData={data}>
       <VisibilityProvider>
         <ActionProvider
           actions={{

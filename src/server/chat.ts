@@ -1,17 +1,20 @@
 import { createServerFn } from '@tanstack/react-start'
 import { createAgent } from '../lib/agent'
 import type { UIElement } from '@json-render/core'
-import type { NestedUIElement } from '../lib/types'
+import type { NestedUIElement, QueryResult } from '../lib/types'
 
 interface AgentMessage {
   role: string
   content: string | Array<{ type: string; tool_use_id?: string; content?: string; name?: string; input?: unknown }>
+  [key: string]: unknown
 }
 
 interface ToolCall {
   name: string
   args: {
     ui?: unknown
+    query?: string
+    resultKey?: string
   }
 }
 
@@ -83,6 +86,43 @@ function extractTextContent(messages: AgentMessage[]): string {
   return ''
 }
 
+function extractQueryResults(messages: AgentMessage[]): QueryResult[] {
+  const results: QueryResult[] = []
+
+  for (const msg of messages) {
+    if (typeof msg.content === 'string') {
+      if (msg.role === 'tool' || msg.type === 'tool') {
+        try {
+          const parsed = JSON.parse(msg.content)
+          if (parsed.success && parsed.resultKey && parsed.data) {
+            results.push({ resultKey: parsed.resultKey, data: parsed.data })
+          }
+        } catch {
+          // Not a JSON response, skip
+        }
+      }
+      continue
+    }
+
+    if (!Array.isArray(msg.content)) continue
+
+    for (const block of msg.content) {
+      if (block.type === 'tool_result' && typeof block.content === 'string') {
+        try {
+          const parsed = JSON.parse(block.content)
+          if (parsed.success && parsed.resultKey && parsed.data) {
+            results.push({ resultKey: parsed.resultKey, data: parsed.data })
+          }
+        } catch {
+          // Not a JSON response, skip
+        }
+      }
+    }
+  }
+
+  return results
+}
+
 interface SendMessageInput {
   message: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
@@ -92,6 +132,7 @@ export interface SendMessageResult {
   success: boolean
   response: string
   ui: NestedUIElement | null
+  queryResults: QueryResult[]
 }
 
 export const sendMessage = createServerFn({ method: 'POST' })
@@ -108,15 +149,17 @@ export const sendMessage = createServerFn({ method: 'POST' })
     ]
 
     try {
-      const result = await agent.invoke({ messages })
+      const result = await agent.invoke({ messages }, { recursionLimit: 50 })
       const agentMessages = result.messages as unknown as AgentMessage[]
       const ui = extractUiFromMessages(agentMessages)
       const response = extractTextContent(agentMessages)
+      const queryResults = extractQueryResults(agentMessages)
 
       return {
         success: true,
         response: response || "I've created the visualization for you.",
         ui: (ui as NestedUIElement | null) ?? null,
+        queryResults,
       }
     } catch (error) {
       console.error('Agent error:', error)
@@ -124,6 +167,7 @@ export const sendMessage = createServerFn({ method: 'POST' })
         success: false,
         response: 'Sorry, I encountered an error processing your request.',
         ui: null,
+        queryResults: [],
       }
     }
   })

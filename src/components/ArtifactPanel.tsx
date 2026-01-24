@@ -1,11 +1,12 @@
 'use client'
 
 import { LayoutDashboard } from 'lucide-react'
-import type { NestedUIElement } from '../lib/types'
+import type { NestedUIElement, QueryResult } from '../lib/types'
 import JsonRenderView from './JsonRenderView'
 
 interface ArtifactPanelProps {
   ui: NestedUIElement | null
+  queryResults?: QueryResult[]
   onResizePointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void
   isResizing?: boolean
   artifactCount?: number
@@ -15,6 +16,7 @@ interface ArtifactPanelProps {
 
 export function ArtifactPanel({
   ui,
+  queryResults = [],
   onResizePointerDown,
   isResizing,
   artifactCount,
@@ -88,7 +90,7 @@ export function ArtifactPanel({
             </div>
           </div>
         ) : (
-          <JsonRenderView ui={ui} />
+          <JsonRenderView ui={ui} queryResults={queryResults} />
         )}
       </div>
     </div>
