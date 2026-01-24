@@ -3,7 +3,6 @@ import { tool } from '@langchain/core/tools'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatGroq } from '@langchain/groq'
 import { z } from 'zod/v3'
-import { mockData, type MockDataKey } from './mockData'
 import { datasetTools } from './datasetTools'
 
 function createModel() {
@@ -53,17 +52,6 @@ AVAILABLE COMPONENTS:
 - LineChart: Line chart. Props: { title: string, dataPath: string, xKey: string, yKey: string }
 - PieChart: Pie chart. Props: { title: string, dataPath: string, nameKey: string, valueKey: string }
 
-DEMO DATA (for testing without database):
-These paths have built-in demo data:
-- /monthlyRevenue - { month, revenue }
-- /quarterlyGrowth - { quarter, growth }
-- /topProducts - { name, sales, revenue }
-- /userMetrics - { totalUsers, activeUsers, etc. }
-- /salesByRegion - { region, sales }
-- /recentOrders - { id, customer, amount, status }
-- /websiteTraffic - { day, visitors }
-- /categoryBreakdown - { category, value }
-
 EXAMPLE - Using database data:
 1. query_dataset({ query: "SELECT month, revenue FROM dataset_sales ORDER BY month", resultKey: "monthly" })
 2. render_ui({ ui: { type: "BarChart", props: { title: "Revenue", dataPath: "/monthly", xKey: "month", yKey: "revenue" } } })
@@ -71,23 +59,6 @@ EXAMPLE - Using database data:
 IMPORTANT: Always call render_ui tool when creating visualizations. A brief text response + the tool call is the correct pattern.
 
 STYLE: Never use emojis in your responses. Keep text professional and clean.`
-
-const getDataTool = tool(
-  async ({ dataKey }) => {
-    const data = mockData[dataKey as MockDataKey]
-    if (!data) {
-      return JSON.stringify({ error: `Data key "${dataKey}" not found. Available keys: ${Object.keys(mockData).join(', ')}` })
-    }
-    return JSON.stringify(data)
-  },
-  {
-    name: 'get_data',
-    description: 'Get data for visualizations. Available keys: monthlyRevenue, quarterlyGrowth, topProducts, userMetrics, salesByRegion, recentOrders, websiteTraffic, categoryBreakdown',
-    schema: z.object({
-      dataKey: z.string().describe('The key of the data to retrieve'),
-    }),
-  }
-)
 
 const renderUiTool = tool(
   async ({ ui }) => {
@@ -106,7 +77,7 @@ export function createAgent() {
   return createDeepAgent({
     model: createModel(),
     systemPrompt,
-    tools: [getDataTool, renderUiTool, ...datasetTools],
+    tools: [renderUiTool, ...datasetTools],
   })
 }
 
