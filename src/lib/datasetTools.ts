@@ -90,7 +90,7 @@ export const getDatasetSchemaTool = tool(
   }
 )
 
-function validateSelectQuery(query: string): { valid: boolean; error?: string } {
+export function validateSelectQuery(query: string): { valid: boolean; error?: string } {
   const normalized = query.trim().toLowerCase()
 
   if (!normalized.startsWith('select')) {
