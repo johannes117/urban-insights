@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { ArrowUp, Settings2 } from 'lucide-react'
+import { ArrowUp, Settings2, Users, TrendingDown, DollarSign, BarChart3, Calendar, Globe, GraduationCap, LayoutDashboard } from 'lucide-react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Message } from '../lib/types'
@@ -42,12 +42,39 @@ export function ChatPanel({ messages, isLoading, onSendMessage }: ChatPanelProps
     <div className="flex h-full flex-col bg-transparent">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 py-4">
         {messages.length === 0 && (
-          <div className="flex h-full items-center justify-center">
+          <div className="flex h-full flex-col items-center justify-center">
             <div className="text-center">
               <p className="text-gray-500">Start a conversation</p>
               <p className="mt-1 text-sm text-gray-400">
                 Ask me to create charts, dashboards, or visualizations
               </p>
+            </div>
+            <div className="mt-6 w-full max-w-md space-y-2">
+              <p className="text-xs text-gray-400 text-center mb-3">Try an example:</p>
+              {[
+                { icon: Users, text: 'Show the population distribution across Victorian LGAs' },
+                { icon: TrendingDown, text: 'Which LGAs have the highest SEIFA disadvantage index?' },
+                { icon: DollarSign, text: 'Compare median household income for Melbourne, Geelong, and Ballarat' },
+                { icon: BarChart3, text: 'Create a bar chart of top 10 LGAs by population' },
+                { icon: Calendar, text: 'What is the median age in each Victorian LGA?' },
+                { icon: Globe, text: 'Show overseas-born population percentage by LGA' },
+                { icon: GraduationCap, text: 'Which areas have the highest Year 12 completion rates?' },
+                { icon: LayoutDashboard, text: 'Create a dashboard comparing regional vs metropolitan Victoria' },
+              ].map((prompt, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => {
+                    if (!isLoading) {
+                      onSendMessage(prompt.text)
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-left text-sm text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900"
+                >
+                  <prompt.icon className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  <span>{prompt.text}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
