@@ -151,13 +151,23 @@ export const uploadDataset = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     requireAuth(data.password)
 
-    const parsed = Papa.parse<Record<string, string>>(data.csvContent, {
-      header: true,
-      skipEmptyLines: true,
-    })
+    let parsed: Papa.ParseResult<Record<string, string>>
+    try {
+      parsed = Papa.parse<Record<string, string>>(data.csvContent, {
+        header: true,
+        skipEmptyLines: true,
+      })
+    } catch (e) {
+      throw new Error(`Failed to parse CSV: ${e instanceof Error ? e.message : 'Unknown parsing error'}`)
+    }
 
     if (parsed.errors.length > 0) {
-      throw new Error(`CSV parsing error: ${parsed.errors[0].message}`)
+      const errorDetails = parsed.errors.slice(0, 3).map((e) => `Row ${e.row}: ${e.message}`).join('; ')
+      throw new Error(`CSV parsing errors: ${errorDetails}`)
+    }
+
+    if (parsed.data.length === 0) {
+      throw new Error('CSV file is empty or contains no valid data rows')
     }
 
     const tableName = sanitizeTableName(data.name)
@@ -167,35 +177,70 @@ export const uploadDataset = createServerFn({ method: 'POST' })
       .map((col) => `"${col.name.replace(/"/g, '""')}" ${getPgType(col.type)}`)
       .join(', ')
 
-    await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${tableName}"`))
-    await db.execute(drizzleSql.raw(`CREATE TABLE "${tableName}" (id SERIAL PRIMARY KEY, ${columnDefs})`))
-
-    const batchSize = 100
-    for (let i = 0; i < parsed.data.length; i += batchSize) {
-      const batch = parsed.data.slice(i, i + batchSize)
-
-      for (const row of batch) {
-        const colNames = data.columns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(', ')
-        const placeholders = data.columns.map((_, idx) => `$${idx + 1}`).join(', ')
-        const values = data.columns.map((col) => convertValue(row[col.name], col.type))
-
-        const insertQuery = `INSERT INTO "${tableName}" (${colNames}) VALUES (${placeholders})`
-        await sql.query(insertQuery, values)
-      }
+    try {
+      await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${tableName}"`))
+    } catch (e) {
+      throw new Error(`Failed to prepare database: ${e instanceof Error ? e.message : 'Unknown error'}`)
     }
 
-    const [dataset] = await db
-      .insert(datasets)
-      .values({
-        name: data.name,
-        description: data.description,
-        tableName,
-        columns: data.columns,
-        rowCount: String(parsed.data.length),
-      })
-      .returning()
+    try {
+      await db.execute(drizzleSql.raw(`CREATE TABLE "${tableName}" (id SERIAL PRIMARY KEY, ${columnDefs})`))
+    } catch (e) {
+      throw new Error(`Failed to create table: ${e instanceof Error ? e.message : 'Unknown error'}. Check column names for invalid characters.`)
+    }
 
-    return dataset
+    const batchSize = 200
+    const colNames = data.columns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(', ')
+
+    try {
+      for (let i = 0; i < parsed.data.length; i += batchSize) {
+        const batch = parsed.data.slice(i, i + batchSize)
+        const allValues: unknown[] = []
+        const valuePlaceholders: string[] = []
+
+        for (let j = 0; j < batch.length; j++) {
+          const row = batch[j]
+          const rowNumber = i + j + 2
+          const rowPlaceholders: string[] = []
+
+          for (let k = 0; k < data.columns.length; k++) {
+            const col = data.columns[k]
+            const paramIndex = allValues.length + 1
+            rowPlaceholders.push(`$${paramIndex}`)
+            try {
+              allValues.push(convertValue(row[col.name], col.type))
+            } catch (e) {
+              throw new Error(`Row ${rowNumber}, column "${col.name}": ${e instanceof Error ? e.message : 'conversion failed'}`)
+            }
+          }
+          valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`)
+        }
+
+        const insertQuery = `INSERT INTO "${tableName}" (${colNames}) VALUES ${valuePlaceholders.join(', ')}`
+        await sql.query(insertQuery, allValues)
+      }
+    } catch (e) {
+      await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${tableName}"`))
+      throw e
+    }
+
+    try {
+      const [dataset] = await db
+        .insert(datasets)
+        .values({
+          name: data.name,
+          description: data.description,
+          tableName,
+          columns: data.columns,
+          rowCount: String(parsed.data.length),
+        })
+        .returning()
+
+      return dataset
+    } catch (e) {
+      await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${tableName}"`))
+      throw new Error(`Failed to save dataset metadata: ${e instanceof Error ? e.message : 'Unknown error'}`)
+    }
   })
 
 export const getDatasetPreview = createServerFn({ method: 'POST' })

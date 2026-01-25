@@ -11,7 +11,39 @@ import {
   type Dataset,
 } from '../../server/admin'
 import type { ColumnInfo } from '../../db/schema'
-import { Upload, Trash2, Eye, Database, X } from 'lucide-react'
+import { Upload, Trash2, Eye, Database, X, Check } from 'lucide-react'
+
+function ProgressStage({
+  label,
+  active,
+  completed,
+}: {
+  label: string
+  active: boolean
+  completed: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div
+        className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${
+          completed
+            ? 'bg-green-500 text-white'
+            : active
+              ? 'border-2 border-blue-500 bg-blue-50'
+              : 'border-2 border-gray-200 bg-white'
+        }`}
+      >
+        {completed && <Check size={14} />}
+        {active && <div className="h-2 w-2 rounded-full bg-blue-500" />}
+      </div>
+      <span
+        className={`text-sm ${completed ? 'text-green-600' : active ? 'font-medium text-blue-600' : 'text-gray-400'}`}
+      >
+        {label}
+      </span>
+    </div>
+  )
+}
 
 export const Route = createFileRoute('/admin/')({
   component: AdminPage,
@@ -42,6 +74,11 @@ function AdminPage() {
   const [previewModal, setPreviewModal] = useState<{
     dataset: Dataset
     rows: Record<string, unknown>[]
+  } | null>(null)
+
+  const [uploadProgress, setUploadProgress] = useState<{
+    stage: 'parsing' | 'creating' | 'inserting' | 'finalizing'
+    totalRows: number
   } | null>(null)
 
   const handleLogin = async () => {
@@ -97,18 +134,48 @@ function AdminPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
-    const content = await file.text()
+    setError(null)
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setError('Please select a CSV file')
+      return
+    }
+
+    const maxSize = 50 * 1024 * 1024 // 50MB
+    if (file.size > maxSize) {
+      setError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 50MB.`)
+      return
+    }
+
+    let content: string
+    try {
+      content = await file.text()
+    } catch {
+      setError('Failed to read file. Please try again.')
+      return
+    }
+
+    if (!content.trim()) {
+      setError('File is empty')
+      return
+    }
+
     setCsvContent(content)
     setFileName(file.name)
 
     try {
       const result = await previewCsv({ data: { password, csvContent: content, name: file.name } })
+      if (result.columns.length === 0) {
+        setError('No columns detected in CSV. Check that the file has headers.')
+        return
+      }
       setPreviewData(result)
       setDatasetName(result.suggestedName)
       setColumns(result.columns)
       setUploadStep('preview')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse CSV')
+      const errorMsg = err instanceof Error ? err.message : 'Failed to parse CSV'
+      setError(`CSV parsing failed: ${errorMsg}`)
     }
   }
 
@@ -118,7 +185,17 @@ function AdminPage() {
 
   const handleUpload = async () => {
     setUploadStep('uploading')
+    setError(null)
+    const totalRows = previewData?.totalRows || 0
+
     try {
+      setUploadProgress({ stage: 'parsing', totalRows })
+      await new Promise((r) => setTimeout(r, 100))
+
+      setUploadProgress({ stage: 'creating', totalRows })
+      await new Promise((r) => setTimeout(r, 100))
+
+      setUploadProgress({ stage: 'inserting', totalRows })
       await uploadDataset({
         data: {
           password,
@@ -128,11 +205,15 @@ function AdminPage() {
           columns,
         },
       })
+
+      setUploadProgress({ stage: 'finalizing', totalRows })
       await loadDatasets()
       resetUpload()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload dataset')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload dataset'
+      setError(errorMessage)
       setUploadStep('preview')
+      setUploadProgress(null)
     }
   }
 
@@ -145,6 +226,8 @@ function AdminPage() {
     setDatasetName('')
     setDatasetDescription('')
     setColumns([])
+    setUploadProgress(null)
+    setError(null)
   }
 
   const handlePreview = async (dataset: Dataset) => {
@@ -283,6 +366,13 @@ function AdminPage() {
               </button>
             </div>
 
+            {error && (
+              <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <div className="font-medium">Upload Error</div>
+                <div className="mt-1 whitespace-pre-wrap">{error}</div>
+              </div>
+            )}
+
             {uploadStep === 'select' && (
               <div className="rounded-lg border-2 border-dashed border-gray-300 p-8 text-center">
                 <Upload className="mx-auto mb-4 h-12 w-12 text-gray-400" />
@@ -411,10 +501,38 @@ function AdminPage() {
               </div>
             )}
 
-            {uploadStep === 'uploading' && (
-              <div className="py-8 text-center">
-                <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
-                <p className="text-gray-600">Uploading and processing...</p>
+            {uploadStep === 'uploading' && uploadProgress && (
+              <div className="py-6">
+                <div className="mb-6 flex justify-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+                </div>
+
+                <div className="mx-auto max-w-md space-y-3">
+                  <ProgressStage
+                    label="Parsing CSV"
+                    active={uploadProgress.stage === 'parsing'}
+                    completed={['creating', 'inserting', 'finalizing'].includes(uploadProgress.stage)}
+                  />
+                  <ProgressStage
+                    label="Creating database table"
+                    active={uploadProgress.stage === 'creating'}
+                    completed={['inserting', 'finalizing'].includes(uploadProgress.stage)}
+                  />
+                  <ProgressStage
+                    label={`Inserting ${uploadProgress.totalRows.toLocaleString()} rows`}
+                    active={uploadProgress.stage === 'inserting'}
+                    completed={uploadProgress.stage === 'finalizing'}
+                  />
+                  <ProgressStage
+                    label="Finalizing"
+                    active={uploadProgress.stage === 'finalizing'}
+                    completed={false}
+                  />
+                </div>
+
+                <p className="mt-6 text-center text-sm text-gray-500">
+                  Please wait, this may take a moment for large datasets...
+                </p>
               </div>
             )}
           </div>
