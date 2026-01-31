@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { db, datasets, type ColumnInfo, type Dataset } from '../db'
 import { eq, sql as drizzleSql } from 'drizzle-orm'
 import { neon } from '@neondatabase/serverless'
-import Papa from 'papaparse'
+import * as Papa from 'papaparse'
 
 function getSql() {
   return neon(process.env.DATABASE_URL!)
@@ -241,6 +241,113 @@ export const uploadDataset = createServerFn({ method: 'POST' })
       await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${tableName}"`))
       throw new Error(`Failed to save dataset metadata: ${e instanceof Error ? e.message : 'Unknown error'}`)
     }
+  })
+
+export const createDatasetTable = createServerFn({ method: 'POST' })
+  .inputValidator(
+    (d: {
+      password: string
+      name: string
+      columns: ColumnInfo[]
+    }) => d
+  )
+  .handler(async ({ data }) => {
+    requireAuth(data.password)
+
+    const tableName = sanitizeTableName(data.name)
+
+    const columnDefs = data.columns
+      .map((col) => `"${col.name.replace(/"/g, '""')}" ${getPgType(col.type)}`)
+      .join(', ')
+
+    try {
+      await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${tableName}"`))
+    } catch (e) {
+      throw new Error(`Failed to prepare database: ${e instanceof Error ? e.message : 'Unknown error'}`)
+    }
+
+    try {
+      await db.execute(drizzleSql.raw(`CREATE TABLE "${tableName}" (id SERIAL PRIMARY KEY, ${columnDefs})`))
+    } catch (e) {
+      throw new Error(`Failed to create table: ${e instanceof Error ? e.message : 'Unknown error'}. Check column names for invalid characters.`)
+    }
+
+    return { tableName }
+  })
+
+export const insertDatasetBatch = createServerFn({ method: 'POST' })
+  .inputValidator(
+    (d: {
+      password: string
+      tableName: string
+      columns: ColumnInfo[]
+      rows: Record<string, string>[]
+    }) => d
+  )
+  .handler(async ({ data }) => {
+    requireAuth(data.password)
+
+    if (data.rows.length === 0) return { inserted: 0 }
+
+    const sql = getSql()
+    const colNames = data.columns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(', ')
+
+    const allValues: unknown[] = []
+    const valuePlaceholders: string[] = []
+
+    for (let j = 0; j < data.rows.length; j++) {
+      const row = data.rows[j]
+      const rowPlaceholders: string[] = []
+
+      for (let k = 0; k < data.columns.length; k++) {
+        const col = data.columns[k]
+        const paramIndex = allValues.length + 1
+        rowPlaceholders.push(`$${paramIndex}`)
+        allValues.push(convertValue(row[col.name], col.type))
+      }
+      valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`)
+    }
+
+    const insertQuery = `INSERT INTO "${data.tableName}" (${colNames}) VALUES ${valuePlaceholders.join(', ')}`
+    await sql.query(insertQuery, allValues)
+
+    return { inserted: data.rows.length }
+  })
+
+export const finalizeDataset = createServerFn({ method: 'POST' })
+  .inputValidator(
+    (d: {
+      password: string
+      name: string
+      description: string
+      tableName: string
+      columns: ColumnInfo[]
+      rowCount: number
+    }) => d
+  )
+  .handler(async ({ data }) => {
+    requireAuth(data.password)
+
+    const [dataset] = await db
+      .insert(datasets)
+      .values({
+        name: data.name,
+        description: data.description,
+        tableName: data.tableName,
+        columns: data.columns,
+        rowCount: String(data.rowCount),
+      })
+      .returning()
+
+    return dataset
+  })
+
+export const deleteDatasetTable = createServerFn({ method: 'POST' })
+  .inputValidator((d: { password: string; tableName: string }) => d)
+  .handler(async ({ data }) => {
+    requireAuth(data.password)
+    await db.execute(drizzleSql.raw(`DROP TABLE IF EXISTS "${data.tableName}"`))
+    return { success: true }
   })
 
 export const getDatasetPreview = createServerFn({ method: 'POST' })

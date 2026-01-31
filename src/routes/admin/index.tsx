@@ -5,13 +5,35 @@ import {
   listDatasets,
   toggleDataset,
   deleteDataset,
-  previewCsv,
-  uploadDataset,
+  createDatasetTable,
+  insertDatasetBatch,
+  finalizeDataset,
+  deleteDatasetTable,
   getDatasetPreview,
   type Dataset,
 } from '../../server/admin'
 import type { ColumnInfo } from '../../db/schema'
 import { Upload, Trash2, Eye, Database, X, Check } from 'lucide-react'
+import * as Papa from 'papaparse'
+
+function inferColumnType(values: string[]): ColumnInfo['type'] {
+  const nonEmpty = values.filter((v) => v !== '' && v !== null && v !== undefined)
+  if (nonEmpty.length === 0) return 'text'
+
+  const allNumeric = nonEmpty.every((v) => !isNaN(Number(v)) && v.trim() !== '')
+  if (allNumeric) return 'numeric'
+
+  const allBoolean = nonEmpty.every((v) =>
+    ['true', 'false', '1', '0', 'yes', 'no'].includes(v.toLowerCase())
+  )
+  if (allBoolean) return 'boolean'
+
+  const datePattern = /^\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}/
+  const allDates = nonEmpty.every((v) => datePattern.test(v))
+  if (allDates) return 'date'
+
+  return 'text'
+}
 
 function ProgressStage({
   label,
@@ -59,7 +81,6 @@ function AdminPage() {
 
   const [showUpload, setShowUpload] = useState(false)
   const [uploadStep, setUploadStep] = useState<'select' | 'preview' | 'uploading'>('select')
-  const [csvContent, setCsvContent] = useState('')
   const [fileName, setFileName] = useState('')
   const [previewData, setPreviewData] = useState<{
     columns: ColumnInfo[]
@@ -79,7 +100,9 @@ function AdminPage() {
   const [uploadProgress, setUploadProgress] = useState<{
     stage: 'parsing' | 'creating' | 'inserting' | 'finalizing'
     totalRows: number
+    insertedRows?: number
   } | null>(null)
+  const [parsedRows, setParsedRows] = useState<Record<string, string>[]>([])
 
   const handleLogin = async () => {
     setIsLoading(true)
@@ -141,37 +164,58 @@ function AdminPage() {
       return
     }
 
-    const maxSize = 50 * 1024 * 1024 // 50MB
+    const maxSize = 100 * 1024 * 1024 // 100MB
     if (file.size > maxSize) {
-      setError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 50MB.`)
+      setError(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum size is 100MB.`)
       return
     }
 
-    let content: string
-    try {
-      content = await file.text()
-    } catch {
-      setError('Failed to read file. Please try again.')
-      return
-    }
-
-    if (!content.trim()) {
-      setError('File is empty')
-      return
-    }
-
-    setCsvContent(content)
     setFileName(file.name)
 
     try {
-      const result = await previewCsv({ data: { password, csvContent: content, name: file.name } })
-      if (result.columns.length === 0) {
+      const content = await file.text()
+
+      if (!content.trim()) {
+        setError('File is empty')
+        return
+      }
+
+      const parsed = Papa.parse<Record<string, string>>(content, {
+        header: true,
+        skipEmptyLines: true,
+      })
+
+      if (parsed.errors.length > 0) {
+        const errorDetails = parsed.errors.slice(0, 3).map((e) => `Row ${e.row}: ${e.message}`).join('; ')
+        setError(`CSV parsing errors: ${errorDetails}`)
+        return
+      }
+
+      const headers = parsed.meta.fields || []
+      if (headers.length === 0) {
         setError('No columns detected in CSV. Check that the file has headers.')
         return
       }
-      setPreviewData(result)
-      setDatasetName(result.suggestedName)
-      setColumns(result.columns)
+
+      const cols: ColumnInfo[] = headers.map((header) => {
+        const values = parsed.data.map((row) => row[header])
+        const inferredType = inferColumnType(values)
+        return {
+          name: header,
+          type: inferredType,
+          originalType: inferredType,
+        }
+      })
+
+      setParsedRows(parsed.data)
+      setPreviewData({
+        columns: cols,
+        sampleRows: parsed.data.slice(0, 10),
+        totalRows: parsed.data.length,
+        suggestedName: file.name.replace(/\.csv$/i, ''),
+      })
+      setDatasetName(file.name.replace(/\.csv$/i, ''))
+      setColumns(cols)
       setUploadStep('preview')
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to parse CSV'
@@ -186,30 +230,53 @@ function AdminPage() {
   const handleUpload = async () => {
     setUploadStep('uploading')
     setError(null)
-    const totalRows = previewData?.totalRows || 0
+    const totalRows = parsedRows.length
+
+    let tableName = ''
 
     try {
-      setUploadProgress({ stage: 'parsing', totalRows })
-      await new Promise((r) => setTimeout(r, 100))
+      setUploadProgress({ stage: 'creating', totalRows, insertedRows: 0 })
 
-      setUploadProgress({ stage: 'creating', totalRows })
-      await new Promise((r) => setTimeout(r, 100))
+      const tableResult = await createDatasetTable({
+        data: { password, name: datasetName, columns },
+      })
+      tableName = tableResult.tableName
 
-      setUploadProgress({ stage: 'inserting', totalRows })
-      await uploadDataset({
+      setUploadProgress({ stage: 'inserting', totalRows, insertedRows: 0 })
+
+      const batchSize = 500
+      let insertedRows = 0
+
+      for (let i = 0; i < parsedRows.length; i += batchSize) {
+        const batch = parsedRows.slice(i, i + batchSize)
+        await insertDatasetBatch({
+          data: { password, tableName, columns, rows: batch },
+        })
+        insertedRows += batch.length
+        setUploadProgress({ stage: 'inserting', totalRows, insertedRows })
+      }
+
+      setUploadProgress({ stage: 'finalizing', totalRows, insertedRows: totalRows })
+
+      await finalizeDataset({
         data: {
           password,
-          csvContent,
           name: datasetName,
           description: datasetDescription,
+          tableName,
           columns,
+          rowCount: totalRows,
         },
       })
 
-      setUploadProgress({ stage: 'finalizing', totalRows })
       await loadDatasets()
       resetUpload()
     } catch (err) {
+      if (tableName) {
+        try {
+          await deleteDatasetTable({ data: { password, tableName } })
+        } catch {}
+      }
       const errorMessage = err instanceof Error ? err.message : 'Failed to upload dataset'
       setError(errorMessage)
       setUploadStep('preview')
@@ -220,13 +287,13 @@ function AdminPage() {
   const resetUpload = () => {
     setShowUpload(false)
     setUploadStep('select')
-    setCsvContent('')
     setFileName('')
     setPreviewData(null)
     setDatasetName('')
     setDatasetDescription('')
     setColumns([])
     setUploadProgress(null)
+    setParsedRows([])
     setError(null)
   }
 
@@ -519,7 +586,11 @@ function AdminPage() {
                     completed={['inserting', 'finalizing'].includes(uploadProgress.stage)}
                   />
                   <ProgressStage
-                    label={`Inserting ${uploadProgress.totalRows.toLocaleString()} rows`}
+                    label={
+                      uploadProgress.stage === 'inserting' && uploadProgress.insertedRows !== undefined
+                        ? `Inserting rows (${uploadProgress.insertedRows.toLocaleString()} / ${uploadProgress.totalRows.toLocaleString()})`
+                        : `Inserting ${uploadProgress.totalRows.toLocaleString()} rows`
+                    }
                     active={uploadProgress.stage === 'inserting'}
                     completed={uploadProgress.stage === 'finalizing'}
                   />
@@ -529,6 +600,22 @@ function AdminPage() {
                     completed={false}
                   />
                 </div>
+
+                {uploadProgress.stage === 'inserting' && uploadProgress.insertedRows !== undefined && (
+                  <div className="mx-auto mt-6 max-w-md">
+                    <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className="h-full bg-blue-600 transition-all duration-300"
+                        style={{
+                          width: `${Math.round((uploadProgress.insertedRows / uploadProgress.totalRows) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-2 text-center text-sm text-gray-600">
+                      {Math.round((uploadProgress.insertedRows / uploadProgress.totalRows) * 100)}%
+                    </p>
+                  </div>
+                )}
 
                 <p className="mt-6 text-center text-sm text-gray-500">
                   Please wait, this may take a moment for large datasets...
