@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
+import { WelcomeScreen } from '../components/WelcomeScreen'
 import { streamMessage } from '../server/chat'
 import type { Message, NestedUIElement, QueryResult, StreamChunk, ToolCall } from '../lib/types'
 
@@ -13,6 +14,7 @@ export const Route = createFileRoute('/')({
 function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [selectedLGA, setSelectedLGA] = useState<string | null>(null)
   const [artifactState, setArtifactState] = useState<{
     items: Array<{ ui: NestedUIElement; queryResults: QueryResult[] }>
     index: number
@@ -21,6 +23,8 @@ function App() {
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
+  const hasConversation = messages.length > 0
+  const hasArtifact = artifactState.items.length > 0
   const currentArtifact =
     artifactState.index >= 0 ? artifactState.items[artifactState.index] ?? null : null
 
@@ -33,6 +37,10 @@ function App() {
   }
 
   const handleSendMessage = async (content: string) => {
+    const messageContent = selectedLGA
+      ? `[Context: User has selected ${selectedLGA}] ${content}`
+      : content
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -45,7 +53,7 @@ function App() {
     try {
       const stream = await streamMessage({
         data: {
-          message: content,
+          message: messageContent,
           history: messages
             .filter((m) => m.role !== 'tool')
             .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
@@ -173,6 +181,17 @@ function App() {
     setIsDragging(false)
   }
 
+  if (!hasConversation) {
+    return (
+      <WelcomeScreen
+        onSendMessage={handleSendMessage}
+        isLoading={isLoading}
+        selectedLGA={selectedLGA}
+        onLGAChange={setSelectedLGA}
+      />
+    )
+  }
+
   return (
     <div
       ref={containerRef}
@@ -182,24 +201,31 @@ function App() {
       onPointerLeave={handlePointerUp}
       onPointerCancel={handlePointerUp}
     >
-      <div className="min-w-0 mr-6" style={{ width: `${chatWidthPercent}%` }}>
+      <div
+        className="min-w-0 mr-6"
+        style={{ width: hasArtifact ? `${chatWidthPercent}%` : '100%' }}
+      >
         <ChatPanel
           messages={messages}
           isLoading={isLoading}
           onSendMessage={handleSendMessage}
+          selectedLGA={selectedLGA}
+          onLGAChange={setSelectedLGA}
         />
       </div>
-      <div className="min-w-0 flex-1">
-        <ArtifactPanel
-          ui={currentArtifact?.ui ?? null}
-          queryResults={currentArtifact?.queryResults ?? []}
-          onResizePointerDown={handlePointerDown}
-          isResizing={isDragging}
-          artifactCount={artifactState.items.length}
-          artifactIndex={artifactState.index}
-          onArtifactIndexChange={handleArtifactIndexChange}
-        />
-      </div>
+      {hasArtifact && (
+        <div className="min-w-0 flex-1">
+          <ArtifactPanel
+            ui={currentArtifact?.ui ?? null}
+            queryResults={currentArtifact?.queryResults ?? []}
+            onResizePointerDown={handlePointerDown}
+            isResizing={isDragging}
+            artifactCount={artifactState.items.length}
+            artifactIndex={artifactState.index}
+            onArtifactIndexChange={handleArtifactIndexChange}
+          />
+        </div>
+      )}
     </div>
   )
 }
