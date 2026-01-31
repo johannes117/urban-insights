@@ -4,6 +4,7 @@ import { handleGoogleCallback } from '../../../server/auth'
 
 export const Route = createFileRoute('/auth/callback/google')({
   component: GoogleCallback,
+  ssr: false,
   validateSearch: (search: Record<string, unknown>) => ({
     code: (search.code as string) || '',
     state: (search.state as string) || '',
