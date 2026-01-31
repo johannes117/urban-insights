@@ -26,6 +26,7 @@
     "@tanstack/react-start": "^1.132.0",
     "@tanstack/router-plugin": "^1.132.0",
     "ai": "^6.0.39",
+    "arctic": "^3.7.0",
     "deepagents": "^1.5.0",
     "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.561.0",
