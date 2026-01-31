@@ -4,8 +4,8 @@ import { eq, and, gt } from 'drizzle-orm'
 import type { User } from '../db/schema'
 
 const getBaseUrl = () => {
-  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   if (process.env.APP_URL) return process.env.APP_URL
+  if (process.env.NODE_ENV === 'production') return 'https://urban-insights-monash.vercel.app'
   return 'http://localhost:3000'
 }
 
