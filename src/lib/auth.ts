@@ -12,7 +12,7 @@ const getBaseUrl = () => {
 export const google = new Google(
   process.env.GOOGLE_CLIENT_ID!,
   process.env.GOOGLE_CLIENT_SECRET!,
-  `${getBaseUrl()}/auth/callback/google`
+  `${getBaseUrl()}/api/auth/callback/google`
 )
 
 export function generateSessionToken(): string {
