@@ -128,13 +128,9 @@ GUIDELINES:
   }
 )
 
-function buildSystemPrompt(lgaContext?: string): string {
-  const lgaSection = lgaContext
-    ? `\nUSER CONTEXT: The user is interested in ${lgaContext}. When relevant, filter queries by this area using LGA columns.\n`
-    : ''
-
+function buildSystemPrompt(): string {
   return `You are a data exploration assistant helping users understand and analyze datasets about their local government area (LGA). Your role is to answer questions, find insights, and help users explore their data through conversation. You can also help users create formal reports to send to their local council members or representatives.
-${lgaSection}
+
 APPROACH:
 - Be conversational and helpful. Answer questions directly.
 - Use tools to query data when needed, then explain what you found.
@@ -190,13 +186,9 @@ function shouldContinue(state: typeof MessagesAnnotation.State): 'tools' | typeo
   return END
 }
 
-export interface CreateAgentOptions {
-  lgaContext?: string
-}
-
-export function createAgent(options: CreateAgentOptions = {}) {
+export function createAgent() {
   const model = createModel().bindTools(allTools)
-  const systemPrompt = buildSystemPrompt(options.lgaContext)
+  const systemPrompt = buildSystemPrompt()
 
   async function callModel(state: typeof MessagesAnnotation.State) {
     const messagesWithSystem = [

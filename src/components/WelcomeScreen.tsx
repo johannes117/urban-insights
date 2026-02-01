@@ -18,15 +18,11 @@ function getTimeBasedGreeting(): string {
 interface WelcomeScreenProps {
   onSendMessage: (message: string) => void
   isLoading: boolean
-  selectedLGA: string | null
-  onLGAChange: (lga: string | null) => void
 }
 
 export function WelcomeScreen({
   onSendMessage,
   isLoading,
-  selectedLGA,
-  onLGAChange,
 }: WelcomeScreenProps) {
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gray-50 px-6">
@@ -38,9 +34,6 @@ export function WelcomeScreen({
         <ChatInput
           onSendMessage={onSendMessage}
           isLoading={isLoading}
-          selectedLGA={selectedLGA}
-          onLGAChange={onLGAChange}
-          showLGASelector={true}
         />
       </div>
 

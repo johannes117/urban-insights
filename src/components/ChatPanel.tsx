@@ -10,16 +10,12 @@ interface ChatPanelProps {
   messages: Message[]
   isLoading: boolean
   onSendMessage: (message: string) => void
-  selectedLGA: string | null
-  onLGAChange: (lga: string | null) => void
 }
 
 export function ChatPanel({
   messages,
   isLoading,
   onSendMessage,
-  selectedLGA,
-  onLGAChange,
 }: ChatPanelProps) {
   const scrollAnchorRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -92,9 +88,6 @@ export function ChatPanel({
           onSendMessage={onSendMessage}
           isLoading={isLoading}
           placeholder="Ask a follow up..."
-          selectedLGA={selectedLGA}
-          onLGAChange={onLGAChange}
-          showLGASelector={true}
         />
       </div>
     </div>

@@ -123,7 +123,6 @@ function extractReportFromMessages(messages: BaseMessage[]): Report | null {
 interface SendMessageInput {
   message: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
-  lgaContext?: string
 }
 
 export interface SendMessageResult {
@@ -136,7 +135,7 @@ export interface SendMessageResult {
 export const sendMessage = createServerFn({ method: 'POST' })
   .inputValidator((d: SendMessageInput) => d)
   .handler(async ({ data }) => {
-    const agent = createAgent({ lgaContext: data.lgaContext })
+    const agent = createAgent()
 
     const messages: BaseMessage[] = [
       ...(data.history?.map((m) =>
@@ -243,7 +242,7 @@ function extractTextFromChunk(chunk: unknown): string | null {
 export const streamMessage = createServerFn({ method: 'POST' })
   .inputValidator((d: SendMessageInput) => d)
   .handler(async function* ({ data }) {
-    const agent = createAgent({ lgaContext: data.lgaContext })
+    const agent = createAgent()
 
     const messages: BaseMessage[] = [
       ...(data.history?.map((m) =>

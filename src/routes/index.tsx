@@ -14,7 +14,6 @@ export const Route = createFileRoute('/')({
 function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedLGA, setSelectedLGA] = useState<string | null>(null)
   const [artifactState, setArtifactState] = useState<{
     items: Artifact[]
     index: number
@@ -53,7 +52,6 @@ function App() {
           history: messages
             .filter((m) => m.role !== 'tool')
             .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
-          lgaContext: selectedLGA || undefined,
         },
       }) as AsyncIterable<StreamChunk>
 
@@ -190,8 +188,6 @@ function App() {
       <WelcomeScreen
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
-        selectedLGA={selectedLGA}
-        onLGAChange={setSelectedLGA}
       />
     )
   }
@@ -213,8 +209,6 @@ function App() {
           messages={messages}
           isLoading={isLoading}
           onSendMessage={handleSendMessage}
-          selectedLGA={selectedLGA}
-          onLGAChange={setSelectedLGA}
         />
       </div>
       {hasArtifact && (
