@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { ChatInput } from "./ChatInput"
 
 const SUGGESTIONS = [
@@ -55,6 +56,19 @@ export function WelcomeScreen({
           </button>
         ))}
       </div>
+
+      <Link
+        to="/data-sources"
+        className="mt-8 text-sm text-gray-400 transition-colors hover:text-gray-600"
+      >
+        View available data sources
+      </Link>
+
+      <img
+        src="/images/urban-insights-logo.png"
+        alt="Urban Insights"
+        className="mt-6 h-24 w-auto"
+      />
     </div>
   )
 }
