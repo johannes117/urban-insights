@@ -1,8 +1,10 @@
-import { createDeepAgent } from 'deepagents'
-import { tool } from '@langchain/core/tools'
 import { ChatAnthropic } from '@langchain/anthropic'
 import { ChatGroq } from '@langchain/groq'
+import { tool } from '@langchain/core/tools'
 import { z } from 'zod/v3'
+import { StateGraph, MessagesAnnotation, END } from '@langchain/langgraph'
+import { ToolNode } from '@langchain/langgraph/prebuilt'
+import { SystemMessage, HumanMessage, AIMessage, BaseMessage, ToolMessage } from '@langchain/core/messages'
 import { datasetTools } from './datasetTools'
 
 function createModel() {
@@ -26,93 +28,102 @@ const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
   })
 )
 
-function buildSystemPrompt(lgaContext?: string): string {
-  const lgaSection = lgaContext
-    ? `
-USER CONTEXT:
-The user has selected: ${lgaContext}
-When querying datasets, filter by this LGA where applicable. Look for columns like "lga_name", "lga", "council", or similar that match this area.
-`
-    : ''
-
-  return `You are a data visualization assistant that queries datasets and creates visual dashboards.
-${lgaSection}
-STRICT WORKFLOW - FOLLOW THESE STEPS IN ORDER:
-
-STEP 1: DISCOVER - Call list_datasets to see available data
-
-STEP 2: GET SCHEMA - For EACH dataset you want to query:
-- Call get_dataset_schema with the dataset "name"
-- The response includes:
-  - "tableName": Use this in your SQL FROM clause
-  - "exactColumnNames": COPY THESE EXACTLY into your SQL
-  - "exampleQuery": A ready-to-use query template
-  - "lgaColumn": Which column to filter by for LGA data
-
-STEP 3: QUERY - Copy column names EXACTLY from schema
-- Use double quotes around column names: SELECT "Column_Name" FROM "tableName"
-- If query fails, the error shows correct column names - use those
-
-STEP 4: RENDER - Call render_ui with dataPath = "/" + your resultKey
-
-CRITICAL - COLUMN NAMES:
-- Column names are CASE-SENSITIVE and often unexpected (e.g., "Tot_P_M" not "total_male")
-- NEVER invent column names - ALWAYS copy from schema response
-- The schema's "exactColumnNames" array has the correct names
-- Use the "exampleQuery" from schema as a starting template
-
-NUMERIC COLUMNS:
-- Check the column "type" in schema - if it says "numeric", use it directly (SUM, AVG, etc.)
-- Only if you get "invalid input syntax for type integer/numeric" error, the column is actually TEXT
-- In that case, use: CAST(REPLACE(REPLACE(column, ',', ''), ' ', '') AS NUMERIC) to convert
-- Do NOT use REPLACE on columns that are already numeric type - it will fail
-
-NAMING:
-- list_datasets "name" (e.g., "sales_2024") -> use for get_dataset_schema
-- get_dataset_schema "tableName" (e.g., "dataset_sales_2024") -> use in SQL
-
-UI COMPONENTS:
-- Card: { title: string }, children allowed
-- Metric: { label: string, value: string, trend?: "up"|"down"|"flat" }
-- Text: { content: string, variant?: "heading"|"subheading"|"paragraph"|"caption" }
-- Grid: { columns?: number }, children allowed
-- Table: { columns: string[], dataPath: string }
-- List: { dataPath: string, itemTemplate: string }
-- BarChart/LineChart: { title: string, dataPath: string, xKey: string, yKey: string }
-- PieChart: { title: string, dataPath: string, nameKey: string, valueKey: string }
-
-EXAMPLE FLOW:
-1. list_datasets() -> { datasets: [{ name: "sales_2024" }] }
-2. get_dataset_schema({ datasetName: "sales_2024" }) -> { tableName: "dataset_sales_2024", exactColumnNames: ["Sale_Month", "Total_Rev"], exampleQuery: "SELECT \"Sale_Month\", \"Total_Rev\" FROM \"dataset_sales_2024\" LIMIT 10" }
-3. query_dataset({ query: "SELECT \"Sale_Month\", \"Total_Rev\" FROM \"dataset_sales_2024\"", resultKey: "sales" })
-4. render_ui({ ui: { type: "BarChart", props: { dataPath: "/sales", xKey: "Sale_Month", yKey: "Total_Rev" } } })
-
-STYLE: No emojis. Brief responses.`
-}
-
 const renderUiTool = tool(
   async ({ ui }) => {
     return JSON.stringify({ success: true, ui })
   },
   {
     name: 'render_ui',
-    description: 'Render UI components in the artifact panel. Pass a UI tree structure with type, props, and optional children.',
+    description: `Render a visualization in the artifact panel.
+
+UI COMPONENTS:
+- Card: { title: string } - container with title, can have children
+- Metric: { label: string, value: string, trend?: "up"|"down"|"flat" } - single stat display
+- Text: { content: string, variant?: "heading"|"subheading"|"paragraph"|"caption" }
+- Grid: { columns?: number } - layout grid, can have children
+- Table: { columns: string[], dataPath: string } - data table
+- BarChart/LineChart: { title: string, dataPath: string, xKey: string, yKey: string }
+- PieChart: { title: string, dataPath: string, nameKey: string, valueKey: string }
+
+dataPath should be "/" + the resultKey from query_dataset (e.g., "/sales")`,
     schema: z.object({
       ui: uiElementSchema.describe('The UI tree to render'),
     }),
   }
 )
 
+function buildSystemPrompt(lgaContext?: string): string {
+  const lgaSection = lgaContext
+    ? `\nUSER CONTEXT: The user is interested in ${lgaContext}. When relevant, filter queries by this area using LGA columns.\n`
+    : ''
+
+  return `You are a data exploration assistant helping users understand and analyze datasets. Your role is to answer questions, find insights, and help users explore their data through conversation.
+${lgaSection}
+APPROACH:
+- Be conversational and helpful. Answer questions directly.
+- Use tools to query data when needed, then explain what you found.
+- When presenting statistical breakdowns, trends, or comparisons, include a visualization (chart/table) alongside your text explanation - this helps users see patterns.
+- For simple factual answers or single values, text alone is fine.
+
+DATASET NAMES - CRITICAL:
+- list_datasets returns a "name" field for each dataset - you MUST use this exact name when calling get_dataset_schema
+- Never guess or modify dataset names - copy them exactly as returned
+- Example: if list_datasets returns { name: "lga_crime_data" }, use "lga_crime_data" not "criminal_offences" or "crime"
+
+WORKFLOW:
+1. Call list_datasets to see available data and get exact dataset names
+2. Call get_dataset_schema with the exact "name" from step 1 to get column info
+3. Use query_dataset with exact column names from the schema
+4. Explain results and add visualizations when showing breakdowns or trends
+
+SQL TIPS:
+- Column names must be quoted: SELECT "Column_Name" FROM "table_name"
+- Copy column names exactly as shown in the schema
+- For numeric operations on text columns, use: CAST(REPLACE(column, ',', '') AS NUMERIC)
+
+RESPONSE STYLE:
+- Be concise but informative
+- Lead with the answer/insight, then provide supporting details
+- No emojis`
+}
+
+const allTools = [renderUiTool, ...datasetTools]
+
+function shouldContinue(state: typeof MessagesAnnotation.State): 'tools' | typeof END {
+  const lastMessage = state.messages[state.messages.length - 1]
+  if (lastMessage && 'tool_calls' in lastMessage && Array.isArray(lastMessage.tool_calls) && lastMessage.tool_calls.length > 0) {
+    return 'tools'
+  }
+  return END
+}
+
 export interface CreateAgentOptions {
   lgaContext?: string
 }
 
 export function createAgent(options: CreateAgentOptions = {}) {
-  return createDeepAgent({
-    model: createModel(),
-    systemPrompt: buildSystemPrompt(options.lgaContext),
-    tools: [renderUiTool, ...datasetTools],
-  })
+  const model = createModel().bindTools(allTools)
+  const systemPrompt = buildSystemPrompt(options.lgaContext)
+
+  async function callModel(state: typeof MessagesAnnotation.State) {
+    const messagesWithSystem = [
+      new SystemMessage(systemPrompt),
+      ...state.messages,
+    ]
+    const response = await model.invoke(messagesWithSystem)
+    return { messages: [response] }
+  }
+
+  const toolNode = new ToolNode(allTools)
+
+  const graph = new StateGraph(MessagesAnnotation)
+    .addNode('agent', callModel)
+    .addNode('tools', toolNode)
+    .addEdge('__start__', 'agent')
+    .addConditionalEdges('agent', shouldContinue)
+    .addEdge('tools', 'agent')
+
+  return graph.compile()
 }
 
 export type Agent = ReturnType<typeof createAgent>
