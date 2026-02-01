@@ -61,11 +61,11 @@ CRITICAL - COLUMN NAMES:
 - The schema's "exactColumnNames" array has the correct names
 - Use the "exampleQuery" from schema as a starting template
 
-HANDLING NUMERIC DATA:
-- Some numeric columns may be stored as TEXT with formatting (e.g., " 1,248 ")
-- If you get "invalid input syntax for type integer/numeric", the column is TEXT
-- Use CAST(REPLACE(REPLACE(column, ',', ''), ' ', '') AS INTEGER) to convert
-- Or just SELECT the column as-is and aggregate in your visualization logic
+NUMERIC COLUMNS:
+- Check the column "type" in schema - if it says "numeric", use it directly (SUM, AVG, etc.)
+- Only if you get "invalid input syntax for type integer/numeric" error, the column is actually TEXT
+- In that case, use: CAST(REPLACE(REPLACE(column, ',', ''), ' ', '') AS NUMERIC) to convert
+- Do NOT use REPLACE on columns that are already numeric type - it will fail
 
 NAMING:
 - list_datasets "name" (e.g., "sales_2024") -> use for get_dataset_schema
