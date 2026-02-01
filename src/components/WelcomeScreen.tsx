@@ -1,6 +1,4 @@
 import { ChatInput } from "./ChatInput"
-import { UserMenu } from "./UserMenu"
-import { useAuth } from "../lib/authContext"
 
 const SUGGESTIONS = [
   "Population distribution across LGAs",
@@ -21,7 +19,6 @@ interface WelcomeScreenProps {
   isLoading: boolean
   selectedLGA: string | null
   onLGAChange: (lga: string | null) => void
-  onShowHistory?: () => void
 }
 
 export function WelcomeScreen({
@@ -29,18 +26,11 @@ export function WelcomeScreen({
   isLoading,
   selectedLGA,
   onLGAChange,
-  onShowHistory,
 }: WelcomeScreenProps) {
-  const { user } = useAuth()
-
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center bg-gray-50 px-6">
-      <div className="absolute right-6 top-6">
-        <UserMenu onShowHistory={user ? onShowHistory : undefined} />
-      </div>
-
       <h1 className="mb-8 text-4xl font-light text-gray-900">
-        {getTimeBasedGreeting()}{user ? `, ${user.name.split(' ')[0]}` : ''}
+        {getTimeBasedGreeting()}
       </h1>
 
       <div className="w-full max-w-2xl">
