@@ -1,22 +1,11 @@
-import { createDeepAgent } from "deepagents";
-import { tool } from "@langchain/core/tools";
-import { ChatAnthropic } from "@langchain/anthropic";
-import { ChatGroq } from "@langchain/groq";
+import { anthropic } from "@ai-sdk/anthropic";
+import { streamText, generateText, tool, stepCountIs } from "ai";
 import { z } from "zod/v3";
-import { datasetTools } from "./datasetTools";
-
-function createModel() {
-  if (process.env.GROQ_API_KEY) {
-    return new ChatGroq({
-      model: "moonshotai/kimi-k2-instruct-0905",
-      apiKey: process.env.GROQ_API_KEY,
-    });
-  }
-  return new ChatAnthropic({
-    model: "claude-sonnet-4-5-20250929",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  });
-}
+import {
+  listDatasets,
+  getDatasetSchema,
+  queryDataset,
+} from "./datasetTools";
 
 const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
   z.object({
@@ -91,34 +80,90 @@ EXAMPLE FLOW:
 3. query_dataset({ query: "SELECT \"Sale_Month\", \"Total_Rev\" FROM \"dataset_sales_2024\"", resultKey: "sales" })
 4. render_ui({ ui: { type: "BarChart", props: { dataPath: "/sales", xKey: "Sale_Month", yKey: "Total_Rev" } } })
 
-STYLE: No emojis. Be professional and concise, but informative. 
-Users are trying to understand and learn about their LGA's, you need guide them in interpreting the data. Try to find key outliers and insights in the data and point them out if anything is unusual. `;
+ERROR HANDLING:
+- If a tool call fails, read the error message carefully and fix the issue
+- Do NOT retry the same exact call more than once - adjust based on the error
+- If you get a column name error, use the correct names from the error response
+- If you get a table name error, use list_datasets to find correct names
+
+STYLE: No emojis. Be professional and concise, but informative.
+Users are trying to understand and learn about their LGA's, you need guide them in interpreting the data. Try to find key outliers and insights in the data and point them out if anything is unusual.`;
 }
 
-const renderUiTool = tool(
-  async ({ ui }) => {
-    return JSON.stringify({ success: true, ui });
-  },
-  {
-    name: "render_ui",
+const tools = {
+  list_datasets: tool({
+    description:
+      "List all available datasets. Returns dataset names, descriptions, column info, and row counts. After calling this, you MUST call get_dataset_schema for each dataset you want to query - never query a dataset without getting its schema first.",
+    inputSchema: z.object({}),
+    execute: async () => listDatasets(),
+  }),
+  get_dataset_schema: tool({
+    description:
+      "REQUIRED before any query_dataset call. Returns the exact tableName and column names you MUST use in queries. Copy column names exactly as shown.",
+    inputSchema: z.object({
+      datasetName: z
+        .string()
+        .describe(
+          'The dataset name from list_datasets (e.g., "sales_2024", not "dataset_sales_2024")'
+        ),
+    }),
+    execute: async ({ datasetName }) => getDatasetSchema({ datasetName }),
+  }),
+  query_dataset: tool({
+    description: `Execute a SQL SELECT query. IMPORTANT: You must call get_dataset_schema first to get the exact tableName and column names.
+Use the tableName from get_dataset_schema (e.g., "dataset_sales_2024") in your FROM clause.
+The resultKey becomes the dataPath in render_ui (e.g., resultKey "sales" -> dataPath "/sales").`,
+    inputSchema: z.object({
+      query: z
+        .string()
+        .describe(
+          "The SQL SELECT query using exact tableName and column names from get_dataset_schema"
+        ),
+      resultKey: z
+        .string()
+        .describe(
+          "A unique key to store results under (used as dataPath in render_ui)"
+        ),
+    }),
+    execute: async ({ query, resultKey }) => queryDataset({ query, resultKey }),
+  }),
+  render_ui: tool({
     description:
       "Render UI components in the artifact panel. Pass a UI tree structure with type, props, and optional children.",
-    schema: z.object({
+    inputSchema: z.object({
       ui: uiElementSchema.describe("The UI tree to render"),
     }),
-  }
-);
+    execute: async ({ ui }) => ({ success: true, ui }),
+  }),
+};
 
-export interface CreateAgentOptions {
+export interface AgentOptions {
   lgaContext?: string;
 }
 
-export function createAgent(options: CreateAgentOptions = {}) {
-  return createDeepAgent({
-    model: createModel(),
-    systemPrompt: buildSystemPrompt(options.lgaContext),
-    tools: [renderUiTool, ...datasetTools],
+export type Message = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export async function runAgent(messages: Message[], options: AgentOptions = {}) {
+  const result = await generateText({
+    model: anthropic("claude-sonnet-4-20250514"),
+    system: buildSystemPrompt(options.lgaContext),
+    messages,
+    tools,
+    stopWhen: stepCountIs(25),
   });
+
+  return result;
 }
 
-export type Agent = ReturnType<typeof createAgent>;
+export function streamAgent(messages: Message[], options: AgentOptions = {}) {
+  return streamText({
+    model: anthropic("claude-sonnet-4-20250514"),
+    system: buildSystemPrompt(options.lgaContext),
+    messages,
+    tools,
+    stopWhen: stepCountIs(25),
+  });
+}
