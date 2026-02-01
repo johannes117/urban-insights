@@ -1,21 +1,21 @@
-import { createDeepAgent } from 'deepagents'
-import { tool } from '@langchain/core/tools'
-import { ChatAnthropic } from '@langchain/anthropic'
-import { ChatGroq } from '@langchain/groq'
-import { z } from 'zod/v3'
-import { datasetTools } from './datasetTools'
+import { createDeepAgent } from "deepagents";
+import { tool } from "@langchain/core/tools";
+import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatGroq } from "@langchain/groq";
+import { z } from "zod/v3";
+import { datasetTools } from "./datasetTools";
 
 function createModel() {
   if (process.env.GROQ_API_KEY) {
     return new ChatGroq({
-      model: 'moonshotai/kimi-k2-instruct-0905',
+      model: "moonshotai/kimi-k2-instruct-0905",
       apiKey: process.env.GROQ_API_KEY,
-    })
+    });
   }
   return new ChatAnthropic({
-    model: 'claude-sonnet-4-5-20250929',
+    model: "claude-sonnet-4-5-20250929",
     apiKey: process.env.ANTHROPIC_API_KEY,
-  })
+  });
 }
 
 const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
@@ -24,7 +24,7 @@ const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
     props: z.record(z.unknown()).optional(),
     children: z.array(uiElementSchema).optional(),
   })
-)
+);
 
 function buildSystemPrompt(lgaContext?: string): string {
   const lgaSection = lgaContext
@@ -33,15 +33,19 @@ USER CONTEXT:
 The user has selected: ${lgaContext}
 When querying datasets, filter by this LGA where applicable. Look for columns like "lga_name", "lga", "council", or similar that match this area.
 `
-    : ''
+    : "";
 
-  return `You are a data visualization assistant that queries datasets and creates visual dashboards.
+  return `You are an agent that helps users understand data about their local government areas. You are able to query datasets and create visual dashboards.
 ${lgaSection}
-STRICT WORKFLOW - FOLLOW THESE STEPS IN ORDER:
 
+NO EMOJIS.
+
+You should chat with the user to understand what they want to know about their LGA. If they are unsure, look at the available datasets, and suggest what they could look at.
+
+If you wish to retrieve some data for an answer or visualization, you can follow these steps:
 STEP 1: DISCOVER - Call list_datasets to see available data
 
-STEP 2: GET SCHEMA - For EACH dataset you want to query:
+STEP 2: GET SCHEMA - For EACH dataset you want to query (You should only use relevant datasets for the user's question or topic):
 - Call get_dataset_schema with the dataset "name"
 - The response includes:
   - "tableName": Use this in your SQL FROM clause
@@ -53,7 +57,7 @@ STEP 3: QUERY - Copy column names EXACTLY from schema
 - Use double quotes around column names: SELECT "Column_Name" FROM "tableName"
 - If query fails, the error shows correct column names - use those
 
-STEP 4: RENDER - Call render_ui with dataPath = "/" + your resultKey
+STEP 4: (if you want to create a visualization) RENDER - Call render_ui with dataPath = "/" + your resultKey
 
 CRITICAL - COLUMN NAMES:
 - Column names are CASE-SENSITIVE and often unexpected (e.g., "Tot_P_M" not "total_male")
@@ -87,24 +91,26 @@ EXAMPLE FLOW:
 3. query_dataset({ query: "SELECT \"Sale_Month\", \"Total_Rev\" FROM \"dataset_sales_2024\"", resultKey: "sales" })
 4. render_ui({ ui: { type: "BarChart", props: { dataPath: "/sales", xKey: "Sale_Month", yKey: "Total_Rev" } } })
 
-STYLE: No emojis. Brief responses.`
+STYLE: No emojis. Be professional and concise, but informative. 
+Users are trying to understand and learn about their LGA's, you need guide them in interpreting the data. Try to find key outliers and insights in the data and point them out if anything is unusual. `;
 }
 
 const renderUiTool = tool(
   async ({ ui }) => {
-    return JSON.stringify({ success: true, ui })
+    return JSON.stringify({ success: true, ui });
   },
   {
-    name: 'render_ui',
-    description: 'Render UI components in the artifact panel. Pass a UI tree structure with type, props, and optional children.',
+    name: "render_ui",
+    description:
+      "Render UI components in the artifact panel. Pass a UI tree structure with type, props, and optional children.",
     schema: z.object({
-      ui: uiElementSchema.describe('The UI tree to render'),
+      ui: uiElementSchema.describe("The UI tree to render"),
     }),
   }
-)
+);
 
 export interface CreateAgentOptions {
-  lgaContext?: string
+  lgaContext?: string;
 }
 
 export function createAgent(options: CreateAgentOptions = {}) {
@@ -112,7 +118,7 @@ export function createAgent(options: CreateAgentOptions = {}) {
     model: createModel(),
     systemPrompt: buildSystemPrompt(options.lgaContext),
     tools: [renderUiTool, ...datasetTools],
-  })
+  });
 }
 
-export type Agent = ReturnType<typeof createAgent>
+export type Agent = ReturnType<typeof createAgent>;
