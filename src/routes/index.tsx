@@ -4,7 +4,7 @@ import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
 import { WelcomeScreen } from '../components/WelcomeScreen'
 import { streamMessage } from '../server/chat'
-import type { Message, NestedUIElement, QueryResult, StreamChunk, ToolCall } from '../lib/types'
+import type { Message, NestedUIElement, QueryResult, StreamChunk, ToolCall, Report, Artifact } from '../lib/types'
 
 export const Route = createFileRoute('/')({
   component: App,
@@ -16,7 +16,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [selectedLGA, setSelectedLGA] = useState<string | null>(null)
   const [artifactState, setArtifactState] = useState<{
-    items: Array<{ ui: NestedUIElement; queryResults: QueryResult[] }>
+    items: Artifact[]
     index: number
   }>({ items: [], index: -1 })
   const [chatWidthPercent, setChatWidthPercent] = useState(33)
@@ -135,12 +135,15 @@ function App() {
             )
           }
 
-          if (typedChunk.ui) {
+          if (typedChunk.ui || typedChunk.report) {
             setArtifactState((prev) => {
-              const items = [
-                ...prev.items,
-                { ui: typedChunk.ui!, queryResults: typedChunk.queryResults || [] },
-              ]
+              const newArtifact: Artifact = {
+                type: typedChunk.report ? 'report' : 'visualization',
+                ui: typedChunk.ui ?? undefined,
+                report: typedChunk.report ?? undefined,
+                queryResults: typedChunk.queryResults || [],
+              }
+              const items = [...prev.items, newArtifact]
               return { items, index: items.length - 1 }
             })
           }
@@ -218,6 +221,7 @@ function App() {
         <div className="min-w-0 flex-1">
           <ArtifactPanel
             ui={currentArtifact?.ui ?? null}
+            report={currentArtifact?.report ?? null}
             queryResults={currentArtifact?.queryResults ?? []}
             onResizePointerDown={handlePointerDown}
             isResizing={isDragging}

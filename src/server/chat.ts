@@ -2,13 +2,13 @@ import { createServerFn } from '@tanstack/react-start'
 import { createAgent } from '../lib/agent'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { UIElement } from '@json-render/core'
-import type { NestedUIElement, QueryResult } from '../lib/types'
+import type { NestedUIElement, QueryResult, Report } from '../lib/types'
 import type { BaseMessage } from '@langchain/core/messages'
 
 type StreamTextChunk = { type: 'text'; content: string }
 type StreamToolStartChunk = { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
 type StreamToolEndChunk = { type: 'tool_end'; toolCallId: string; result: {} }
-type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[] }
+type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[]; report: Report | null }
 type StreamChunk = StreamTextChunk | StreamToolStartChunk | StreamToolEndChunk | StreamDoneChunk
 
 function extractUiFromMessages(messages: BaseMessage[]): UIElement | null {
@@ -84,6 +84,40 @@ function extractQueryResults(messages: BaseMessage[]): QueryResult[] {
   }
 
   return results
+}
+
+function extractReportFromMessages(messages: BaseMessage[]): Report | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    const msgAny = msg as unknown as Record<string, unknown>
+
+    if (msgAny.tool_calls && Array.isArray(msgAny.tool_calls)) {
+      const toolCalls = msgAny.tool_calls as Array<{ name: string; args: Record<string, unknown> }>
+      for (let j = toolCalls.length - 1; j >= 0; j--) {
+        const tc = toolCalls[j]
+        if (tc.name === 'render_report' && tc.args?.report) {
+          return tc.args.report as Report
+        }
+      }
+    }
+
+    if (msgAny.additional_kwargs && typeof msgAny.additional_kwargs === 'object') {
+      const kwargs = msgAny.additional_kwargs as Record<string, unknown>
+      if (kwargs.tool_calls && Array.isArray(kwargs.tool_calls)) {
+        const toolCalls = kwargs.tool_calls as Array<{ function?: { name: string; arguments: string } }>
+        for (let j = toolCalls.length - 1; j >= 0; j--) {
+          const tc = toolCalls[j]
+          if (tc.function?.name === 'render_report') {
+            try {
+              const args = JSON.parse(tc.function.arguments)
+              if (args.report) return args.report as Report
+            } catch {}
+          }
+        }
+      }
+    }
+  }
+  return null
 }
 
 interface SendMessageInput {
@@ -283,14 +317,16 @@ export const streamMessage = createServerFn({ method: 'POST' })
 
       const ui = extractUiFromMessages(finalMessages)
       const queryResults = extractQueryResults(finalMessages)
+      const report = extractReportFromMessages(finalMessages)
 
       yield {
         type: 'done',
         ui: (ui as NestedUIElement | null) ?? null,
         queryResults,
+        report,
       } satisfies StreamDoneChunk
     } catch (error) {
       console.error('Agent streaming error:', error)
-      yield { type: 'done', ui: null, queryResults: [] } satisfies StreamDoneChunk
+      yield { type: 'done', ui: null, queryResults: [], report: null } satisfies StreamDoneChunk
     }
   })

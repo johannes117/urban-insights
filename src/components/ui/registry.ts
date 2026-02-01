@@ -7,6 +7,7 @@ import { List } from './List'
 import { BarChart } from './BarChart'
 import { LineChart } from './LineChart'
 import { PieChart } from './PieChart'
+import { Container } from './Container'
 
 export const componentRegistry = {
   Card,
@@ -18,6 +19,9 @@ export const componentRegistry = {
   BarChart,
   LineChart,
   PieChart,
+  div: Container,
+  span: Container,
+  section: Container,
 }
 
 export type ComponentRegistry = typeof componentRegistry
