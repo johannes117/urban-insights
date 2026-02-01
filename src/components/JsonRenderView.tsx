@@ -65,17 +65,22 @@ export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderView
     }
   }
 
+  const ActionProviderWithActions = ActionProvider as React.ComponentType<{
+    children: React.ReactNode
+    actions: Record<string, () => void>
+  }>
+
   return (
     <DataProvider initialData={data}>
       <VisibilityProvider>
-        <ActionProvider
+        <ActionProviderWithActions
           actions={{
             refresh: () => handleAction('refresh'),
             export: () => handleAction('export'),
           }}
         >
           <Renderer tree={flatTree} registry={componentRegistry} />
-        </ActionProvider>
+        </ActionProviderWithActions>
       </VisibilityProvider>
     </DataProvider>
   )

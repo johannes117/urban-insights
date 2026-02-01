@@ -30,23 +30,44 @@ export const listDatasetsTool = tool(
     }
 
     return JSON.stringify({
+      message: 'IMPORTANT: Use the "name" field (not tableName) when calling get_dataset_schema. You MUST call get_dataset_schema before running any queries.',
       datasets: results.map((d) => ({
-        id: d.id,
         name: d.name,
         description: d.description,
-        tableName: d.tableName,
         rowCount: d.rowCount,
-        columns: d.columns.map((c) => `${c.name} (${c.type})`).join(', '),
+        columns: d.columns.map((c) => ({ name: c.name, type: c.type })),
       })),
     })
   },
   {
     name: 'list_datasets',
     description:
-      'List all available datasets that can be queried. Returns dataset names, descriptions, column info, and row counts. Call this first to see what data is available.',
+      'List all available datasets. Returns dataset names, descriptions, column info, and row counts. After calling this, you MUST call get_dataset_schema for each dataset you want to query - never query a dataset without getting its schema first.',
     schema: z.object({}),
   }
 )
+
+function identifyLgaColumn(columns: { name: string; type: string }[]): string | null {
+  const lgaPatterns = ['lga_name', 'lga', 'council', 'local_government', 'municipality']
+  for (const col of columns) {
+    const lower = col.name.toLowerCase()
+    for (const pattern of lgaPatterns) {
+      if (lower.includes(pattern)) {
+        return col.name
+      }
+    }
+  }
+  return null
+}
+
+function generateExampleQuery(tableName: string, columns: { name: string; type: string }[], lgaColumn: string | null): string {
+  const selectCols = columns.slice(0, 5).map(c => `"${c.name}"`).join(', ')
+  let query = `SELECT ${selectCols} FROM "${tableName}" LIMIT 10`
+  if (lgaColumn) {
+    query = `SELECT ${selectCols} FROM "${tableName}" WHERE "${lgaColumn}" = 'Your LGA Name' LIMIT 10`
+  }
+  return query
+}
 
 export const getDatasetSchemaTool = tool(
   async ({ datasetName }) => {
@@ -59,8 +80,9 @@ export const getDatasetSchemaTool = tool(
     if (!dataset) {
       const allDatasets = await db.select({ name: datasets.name }).from(datasets).where(eq(datasets.enabled, true))
       return JSON.stringify({
-        error: `Dataset "${datasetName}" not found.`,
+        error: `Dataset "${datasetName}" not found. Use one of the exact names from list_datasets.`,
         availableDatasets: allDatasets.map((d) => d.name),
+        hint: 'The datasetName parameter should be the "name" field from list_datasets, NOT the tableName.',
       })
     }
 
@@ -69,23 +91,29 @@ export const getDatasetSchemaTool = tool(
     }
 
     const sql = getSql()
-    const sampleRows = await sql.query(`SELECT * FROM "${dataset.tableName}" LIMIT 10`, [])
+    const sampleRows = await sql.query(`SELECT * FROM "${dataset.tableName}" LIMIT 5`, [])
+
+    const columnNames = dataset.columns.map(c => c.name)
+    const lgaColumn = identifyLgaColumn(dataset.columns)
+    const exampleQuery = generateExampleQuery(dataset.tableName, dataset.columns, lgaColumn)
 
     return JSON.stringify({
-      name: dataset.name,
-      description: dataset.description,
       tableName: dataset.tableName,
       totalRows: dataset.rowCount,
+      exactColumnNames: columnNames,
+      lgaColumn: lgaColumn ? `Filter by LGA using column "${lgaColumn}"` : 'No LGA column detected',
+      exampleQuery,
       columns: dataset.columns,
-      sampleRows,
+      sampleData: sampleRows,
+      critical: `COPY THESE EXACT COLUMN NAMES: ${columnNames.map(n => `"${n}"`).join(', ')}`,
     })
   },
   {
     name: 'get_dataset_schema',
     description:
-      'Get detailed schema information and sample data for a specific dataset. Use this to understand the structure before writing queries. Returns column names, types, and first 10 rows.',
+      'REQUIRED before any query_dataset call. Returns the exact tableName and column names you MUST use in queries. Copy column names exactly as shown.',
     schema: z.object({
-      datasetName: z.string().describe('The name of the dataset to inspect'),
+      datasetName: z.string().describe('The dataset name from list_datasets (e.g., "sales_2024", not "dataset_sales_2024")'),
     }),
   }
 )
@@ -108,12 +136,57 @@ export function validateSelectQuery(query: string): { valid: boolean; error?: st
   return { valid: true }
 }
 
+interface TableInfo {
+  columns: string[]
+  originalColumns: string[]
+}
+
+async function getAvailableTables(): Promise<Map<string, TableInfo>> {
+  const allDatasets = await db
+    .select({ tableName: datasets.tableName, columns: datasets.columns })
+    .from(datasets)
+    .where(eq(datasets.enabled, true))
+
+  const tableMap = new Map<string, TableInfo>()
+  for (const d of allDatasets) {
+    tableMap.set(d.tableName.toLowerCase(), {
+      columns: d.columns.map((c) => c.name.toLowerCase()),
+      originalColumns: d.columns.map((c) => c.name),
+    })
+  }
+  return tableMap
+}
+
+function extractTableFromQuery(query: string): string | null {
+  const match = query.match(/\bfrom\s+["']?(\w+)["']?/i)
+  return match ? match[1] : null
+}
+
 export const queryDatasetTool = tool(
   async ({ query, resultKey }) => {
     const validation = validateSelectQuery(query)
     if (!validation.valid) {
       return JSON.stringify({ error: validation.error })
     }
+
+    const tableName = extractTableFromQuery(query)
+    if (!tableName) {
+      return JSON.stringify({ error: 'Could not parse table name from query. Ensure your query has a valid FROM clause.' })
+    }
+
+    const availableTables = await getAvailableTables()
+    const tableNameLower = tableName.toLowerCase()
+
+    if (!availableTables.has(tableNameLower)) {
+      const tableNames = Array.from(availableTables.keys())
+      return JSON.stringify({
+        error: `Table "${tableName}" not found.`,
+        availableTables: tableNames,
+        hint: 'Use the exact tableName from get_dataset_schema (e.g., "dataset_sales_2024"). Did you call get_dataset_schema first?',
+      })
+    }
+
+    const tableInfo = availableTables.get(tableNameLower)!
 
     try {
       const sql = getSql()
@@ -127,19 +200,31 @@ export const queryDatasetTool = tool(
         data: rows,
       })
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        const exampleCols = tableInfo.originalColumns.slice(0, 5).map(c => `"${c}"`).join(', ')
+        return JSON.stringify({
+          error: `Query failed: ${errorMessage}`,
+          correctColumnNames: tableInfo.originalColumns,
+          exampleQuery: `SELECT ${exampleCols} FROM "${tableName}" LIMIT 10`,
+          hint: 'COPY column names exactly as shown in correctColumnNames. Use double quotes around column names.',
+        })
+      }
+
       return JSON.stringify({
-        error: `Query failed: ${err instanceof Error ? err.message : String(err)}`,
+        error: `Query failed: ${errorMessage}`,
+        hint: 'Check that you are using the exact tableName and column names from get_dataset_schema.',
       })
     }
   },
   {
     name: 'query_dataset',
-    description: `Execute a SQL SELECT query on the database. Only SELECT queries are allowed.
-Use the tableName from list_datasets or get_dataset_schema (e.g., "dataset_sales_2024").
-The resultKey you provide will be used as the dataPath in render_ui (e.g., resultKey "sales" -> dataPath "/sales").
-You can run multiple queries and use different resultKeys to combine data in visualizations.`,
+    description: `Execute a SQL SELECT query. IMPORTANT: You must call get_dataset_schema first to get the exact tableName and column names.
+Use the tableName from get_dataset_schema (e.g., "dataset_sales_2024") in your FROM clause.
+The resultKey becomes the dataPath in render_ui (e.g., resultKey "sales" -> dataPath "/sales").`,
     schema: z.object({
-      query: z.string().describe('The SQL SELECT query to execute'),
+      query: z.string().describe('The SQL SELECT query using exact tableName and column names from get_dataset_schema'),
       resultKey: z.string().describe('A unique key to store results under (used as dataPath in render_ui)'),
     }),
   }

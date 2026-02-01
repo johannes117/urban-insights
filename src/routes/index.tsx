@@ -37,10 +37,6 @@ function App() {
   }
 
   const handleSendMessage = async (content: string) => {
-    const messageContent = selectedLGA
-      ? `[Context: User has selected ${selectedLGA}] ${content}`
-      : content
-
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -53,19 +49,20 @@ function App() {
     try {
       const stream = await streamMessage({
         data: {
-          message: messageContent,
+          message: content,
           history: messages
             .filter((m) => m.role !== 'tool')
             .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+          lgaContext: selectedLGA || undefined,
         },
-      })
+      }) as AsyncIterable<StreamChunk>
 
       let currentTextMessageId: string | null = null
       let currentText = ''
       const toolMessageIds = new Map<string, string>()
 
       for await (const chunk of stream) {
-        const typedChunk = chunk as StreamChunk
+        const typedChunk = chunk
 
         if (typedChunk.type === 'text') {
           if (!currentTextMessageId) {

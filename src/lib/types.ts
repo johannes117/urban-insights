@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 
 export interface NestedUIElement {
   type: string
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   props?: { [key: string]: {} }
   children?: NestedUIElement[]
 }
@@ -41,6 +42,8 @@ export interface ComponentProps<T = Record<string, unknown>> {
 
 export type StreamChunk =
   | { type: 'text'; content: string }
-  | { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, unknown> }
-  | { type: 'tool_end'; toolCallId: string; result: unknown }
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  | { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  | { type: 'tool_end'; toolCallId: string; result: {} }
   | { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[] }

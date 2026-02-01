@@ -20,11 +20,18 @@ function sanitizeTableName(name: string): string {
   return 'dataset_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 50)
 }
 
+function stripNumericFormatting(value: string): string {
+  return value.replace(/[\s,]/g, '')
+}
+
 function inferColumnType(values: string[]): ColumnInfo['type'] {
   const nonEmpty = values.filter((v) => v !== '' && v !== null && v !== undefined)
   if (nonEmpty.length === 0) return 'text'
 
-  const allNumeric = nonEmpty.every((v) => !isNaN(Number(v)) && v.trim() !== '')
+  const allNumeric = nonEmpty.every((v) => {
+    const cleaned = stripNumericFormatting(v)
+    return cleaned !== '' && !isNaN(Number(cleaned))
+  })
   if (allNumeric) return 'numeric'
 
   const allBoolean = nonEmpty.every((v) =>
@@ -57,7 +64,7 @@ function convertValue(value: string, type: ColumnInfo['type']): unknown {
 
   switch (type) {
     case 'numeric':
-      return Number(value)
+      return Number(stripNumericFormatting(value))
     case 'boolean':
       return ['true', '1', 'yes'].includes(value.toLowerCase())
     case 'date':

@@ -26,52 +26,69 @@ const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
   })
 )
 
-const systemPrompt = `You are a UI visualization assistant. Your PRIMARY job is to create visual components using tools.
+function buildSystemPrompt(lgaContext?: string): string {
+  const lgaSection = lgaContext
+    ? `
+USER CONTEXT:
+The user has selected: ${lgaContext}
+When querying datasets, filter by this LGA where applicable. Look for columns like "lga_name", "lga", "council", or similar that match this area.
+`
+    : ''
 
-CRITICAL: When the user asks for ANY visualization, chart, graph, dashboard, or data display:
-1. You MUST call the render_ui tool to create the visualization
-2. Do NOT just describe what you would create - actually call the tool
-3. Keep your text response brief - the visualization speaks for itself
+  return `You are a data visualization assistant that queries datasets and creates visual dashboards.
+${lgaSection}
+STRICT WORKFLOW - FOLLOW THESE STEPS IN ORDER:
 
-MANDATORY WORKFLOW FOR DATABASE QUERIES:
-You MUST follow this exact sequence - never skip steps:
+STEP 1: DISCOVER - Call list_datasets to see available data
 
-1. FIRST: Call get_dataset_schema to get the EXACT table name and column names
-   - The schema response contains the precise column names you must use
-   - NEVER guess or assume column names - always check schema first
+STEP 2: GET SCHEMA - For EACH dataset you want to query:
+- Call get_dataset_schema with the dataset "name"
+- The response includes:
+  - "tableName": Use this in your SQL FROM clause
+  - "exactColumnNames": COPY THESE EXACTLY into your SQL
+  - "exampleQuery": A ready-to-use query template
+  - "lgaColumn": Which column to filter by for LGA data
 
-2. THEN: Use query_dataset with the EXACT names from the schema
-   - Use the exact table name returned by get_dataset_schema
-   - Use the exact column names - they may have underscores, prefixes, or different casing
-   - Provide a resultKey (e.g., "sales_data") for storing results
+STEP 3: QUERY - Copy column names EXACTLY from schema
+- Use double quotes around column names: SELECT "Column_Name" FROM "tableName"
+- If query fails, the error shows correct column names - use those
 
-3. FINALLY: Call render_ui using that resultKey as dataPath (e.g., dataPath: "/sales_data")
+STEP 4: RENDER - Call render_ui with dataPath = "/" + your resultKey
 
-IMPORTANT: If a query fails, check the schema again. Column names in this database often differ from what you might expect. Always verify against the schema before retrying.
+CRITICAL - COLUMN NAMES:
+- Column names are CASE-SENSITIVE and often unexpected (e.g., "Tot_P_M" not "total_male")
+- NEVER invent column names - ALWAYS copy from schema response
+- The schema's "exactColumnNames" array has the correct names
+- Use the "exampleQuery" from schema as a starting template
 
-You can run multiple queries with different resultKeys to combine data in one visualization.
+HANDLING NUMERIC DATA:
+- Some numeric columns may be stored as TEXT with formatting (e.g., " 1,248 ")
+- If you get "invalid input syntax for type integer/numeric", the column is TEXT
+- Use CAST(REPLACE(REPLACE(column, ',', ''), ' ', '') AS INTEGER) to convert
+- Or just SELECT the column as-is and aggregate in your visualization logic
 
-AVAILABLE COMPONENTS:
-- Card: Container with a title. Props: { title: string }. Can have children.
-- Metric: Display a KPI value. Props: { label: string, value: string, trend?: "up" | "down" | "flat" }
-- Text: Display text. Props: { content: string, variant?: "heading" | "subheading" | "paragraph" | "caption" }
-- Grid: Layout grid. Props: { columns?: number }. Can have children.
-- Table: Data table. Props: { columns: string[], dataPath: string }
-- List: Simple list. Props: { dataPath: string, itemTemplate: string }
-- BarChart: Bar chart. Props: { title: string, dataPath: string, xKey: string, yKey: string }
-- LineChart: Line chart. Props: { title: string, dataPath: string, xKey: string, yKey: string }
-- PieChart: Pie chart. Props: { title: string, dataPath: string, nameKey: string, valueKey: string }
+NAMING:
+- list_datasets "name" (e.g., "sales_2024") -> use for get_dataset_schema
+- get_dataset_schema "tableName" (e.g., "dataset_sales_2024") -> use in SQL
 
-EXAMPLE - Using database data:
-1. get_dataset_schema({ datasetName: "dataset_sales" }) -> Returns columns: ["sale_month", "total_revenue", "region"]
-2. query_dataset({ query: "SELECT sale_month, total_revenue FROM dataset_sales ORDER BY sale_month", resultKey: "monthly" })
-3. render_ui({ ui: { type: "BarChart", props: { title: "Revenue", dataPath: "/monthly", xKey: "sale_month", yKey: "total_revenue" } } })
+UI COMPONENTS:
+- Card: { title: string }, children allowed
+- Metric: { label: string, value: string, trend?: "up"|"down"|"flat" }
+- Text: { content: string, variant?: "heading"|"subheading"|"paragraph"|"caption" }
+- Grid: { columns?: number }, children allowed
+- Table: { columns: string[], dataPath: string }
+- List: { dataPath: string, itemTemplate: string }
+- BarChart/LineChart: { title: string, dataPath: string, xKey: string, yKey: string }
+- PieChart: { title: string, dataPath: string, nameKey: string, valueKey: string }
 
-Note: The column names came from the schema (sale_month, total_revenue) - never assume column names like "month" or "revenue".
+EXAMPLE FLOW:
+1. list_datasets() -> { datasets: [{ name: "sales_2024" }] }
+2. get_dataset_schema({ datasetName: "sales_2024" }) -> { tableName: "dataset_sales_2024", exactColumnNames: ["Sale_Month", "Total_Rev"], exampleQuery: "SELECT \"Sale_Month\", \"Total_Rev\" FROM \"dataset_sales_2024\" LIMIT 10" }
+3. query_dataset({ query: "SELECT \"Sale_Month\", \"Total_Rev\" FROM \"dataset_sales_2024\"", resultKey: "sales" })
+4. render_ui({ ui: { type: "BarChart", props: { dataPath: "/sales", xKey: "Sale_Month", yKey: "Total_Rev" } } })
 
-IMPORTANT: Always call render_ui tool when creating visualizations. A brief text response + the tool call is the correct pattern.
-
-STYLE: Never use emojis in your responses. Keep text professional and clean.`
+STYLE: No emojis. Brief responses.`
+}
 
 const renderUiTool = tool(
   async ({ ui }) => {
@@ -86,10 +103,14 @@ const renderUiTool = tool(
   }
 )
 
-export function createAgent() {
+export interface CreateAgentOptions {
+  lgaContext?: string
+}
+
+export function createAgent(options: CreateAgentOptions = {}) {
   return createDeepAgent({
     model: createModel(),
-    systemPrompt,
+    systemPrompt: buildSystemPrompt(options.lgaContext),
     tools: [renderUiTool, ...datasetTools],
   })
 }

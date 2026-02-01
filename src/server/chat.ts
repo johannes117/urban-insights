@@ -1,7 +1,13 @@
 import { createServerFn } from '@tanstack/react-start'
 import { createAgent } from '../lib/agent'
 import type { UIElement } from '@json-render/core'
-import type { NestedUIElement, QueryResult, StreamChunk } from '../lib/types'
+import type { NestedUIElement, QueryResult } from '../lib/types'
+
+type StreamTextChunk = { type: 'text'; content: string }
+type StreamToolStartChunk = { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
+type StreamToolEndChunk = { type: 'tool_end'; toolCallId: string; result: {} }
+type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[] }
+type StreamChunk = StreamTextChunk | StreamToolStartChunk | StreamToolEndChunk | StreamDoneChunk
 
 interface AgentMessage {
   role: string
@@ -126,6 +132,7 @@ function extractQueryResults(messages: AgentMessage[]): QueryResult[] {
 interface SendMessageInput {
   message: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
+  lgaContext?: string
 }
 
 export interface SendMessageResult {
@@ -138,7 +145,7 @@ export interface SendMessageResult {
 export const sendMessage = createServerFn({ method: 'POST' })
   .inputValidator((d: SendMessageInput) => d)
   .handler(async ({ data }) => {
-    const agent = createAgent()
+    const agent = createAgent({ lgaContext: data.lgaContext })
 
     const messages = [
       ...(data.history?.map((m) => ({
@@ -249,8 +256,8 @@ function isToolMessage(messageChunk: unknown): { toolCallId: string; content: st
 
 export const streamMessage = createServerFn({ method: 'POST' })
   .inputValidator((d: SendMessageInput) => d)
-  .handler(async function* ({ data }): AsyncGenerator<StreamChunk> {
-    const agent = createAgent()
+  .handler(async function* ({ data }) {
+    const agent = createAgent({ lgaContext: data.lgaContext })
 
     const messages = [
       ...(data.history?.map((m) => ({
@@ -263,7 +270,7 @@ export const streamMessage = createServerFn({ method: 'POST' })
     try {
       const stream = await agent.stream(
         { messages },
-        { recursionLimit: 50, streamMode: ['messages', 'values'] as const }
+        { recursionLimit: 50, streamMode: ['messages', 'values'] }
       )
 
       let finalMessages: AgentMessage[] = []
@@ -271,7 +278,7 @@ export const streamMessage = createServerFn({ method: 'POST' })
       const pendingToolCalls = new Map<string, { name: string; args: Record<string, unknown> }>()
 
       for await (const chunk of stream) {
-        const [mode, chunkData] = chunk as [string, unknown]
+        const [mode, chunkData] = chunk as unknown as [string, unknown]
 
         if (mode === 'messages') {
           const [messageChunk, metadata] = chunkData as [unknown, Record<string, unknown>]
@@ -286,8 +293,8 @@ export const streamMessage = createServerFn({ method: 'POST' })
                 type: 'tool_start',
                 toolCallId,
                 name: tc.name,
-                args: tc.args,
-              }
+                args: tc.args as Record<string, {}>,
+              } satisfies StreamToolStartChunk
             }
           }
 
@@ -296,7 +303,7 @@ export const streamMessage = createServerFn({ method: 'POST' })
             const pending = pendingToolCalls.get(toolResult.toolCallId)
             if (pending) {
               pendingToolCalls.delete(toolResult.toolCallId)
-              let parsedResult: unknown = toolResult.content
+              let parsedResult: {} = toolResult.content
               try {
                 parsedResult = JSON.parse(toolResult.content)
               } catch {
@@ -306,7 +313,7 @@ export const streamMessage = createServerFn({ method: 'POST' })
                 type: 'tool_end',
                 toolCallId: toolResult.toolCallId,
                 result: parsedResult,
-              }
+              } satisfies StreamToolEndChunk
             }
             continue
           }
@@ -317,7 +324,7 @@ export const streamMessage = createServerFn({ method: 'POST' })
 
           const text = extractTextFromMessageChunk(messageChunk)
           if (text) {
-            yield { type: 'text', content: text }
+            yield { type: 'text', content: text } satisfies StreamTextChunk
           }
         } else if (mode === 'values') {
           const values = chunkData as { messages?: AgentMessage[] }
@@ -334,9 +341,9 @@ export const streamMessage = createServerFn({ method: 'POST' })
         type: 'done',
         ui: (ui as NestedUIElement | null) ?? null,
         queryResults,
-      }
+      } satisfies StreamDoneChunk
     } catch (error) {
       console.error('Agent streaming error:', error)
-      yield { type: 'done', ui: null, queryResults: [] }
+      yield { type: 'done', ui: null, queryResults: [] } satisfies StreamDoneChunk
     }
   })

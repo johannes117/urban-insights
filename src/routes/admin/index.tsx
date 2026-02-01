@@ -20,7 +20,10 @@ function inferColumnType(values: string[]): ColumnInfo['type'] {
   const nonEmpty = values.filter((v) => v !== '' && v !== null && v !== undefined)
   if (nonEmpty.length === 0) return 'text'
 
-  const allNumeric = nonEmpty.every((v) => !isNaN(Number(v)) && v.trim() !== '')
+  const allNumeric = nonEmpty.every((v) => {
+    const cleaned = v.replace(/[\s,]/g, '')
+    return cleaned !== '' && !isNaN(Number(cleaned))
+  })
   if (allNumeric) return 'numeric'
 
   const allBoolean = nonEmpty.every((v) =>
