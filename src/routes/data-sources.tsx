@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { ExternalLink } from 'lucide-react'
 
 export const Route = createFileRoute('/data-sources')({
   component: DataSourcesPage,
@@ -42,18 +43,18 @@ function DataSourcesPage() {
 
       <div className="flex justify-center px-6 py-12">
         <main className="w-full max-w-xl">
-          <div className="mb-2 text-sm font-medium text-emerald-600">Reference</div>
+          <div className="mb-2 text-sm font-medium text-cyan-600">Reference</div>
           <h1 className="mb-3 text-4xl font-bold text-gray-900">Data Sources</h1>
           <p className="mb-12 text-lg text-gray-500">
-            Available datasets and their coverage across Victorian Local Government Areas.
+            Details of the datasets available for Victorian local government areas.
           </p>
 
           <section id="overview" className="mb-12 scroll-mt-24">
             <h2 className="mb-4 text-2xl font-semibold text-gray-900">Overview</h2>
             <p className="mb-4 leading-relaxed text-gray-600">
               Urban Insights brings together authoritative datasets from government agencies to provide
-              comprehensive insights into Victorian communities. All data is organised by Local Government
-              Area (LGA) for easy comparison and analysis.
+              comprehensive insights into Victorian communities. All data is organised by local government
+              area (LGA) for easy comparison and analysis.
             </p>
             <p className="leading-relaxed text-gray-600">
               Simply ask questions in natural language and Urban Insights will automatically query the
@@ -62,10 +63,20 @@ function DataSourcesPage() {
           </section>
 
           <section id="census" className="mb-12 scroll-mt-24">
-            <h2 className="mb-4 text-2xl font-semibold text-gray-900">2021 Census Data</h2>
+            <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
+              2021 Census Data
+              <span>
+                <a href="https://www.abs.gov.au/statistics" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={18} className="text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              </span>
+            </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
-              Comprehensive demographic and socioeconomic data from the 2021 Australian Census,
-              provided by the <span className="text-gray-900">Australian Bureau of Statistics</span>.
+              Comprehensive demographic and socioeconomic data from the 2021 Australian Census&nbsp;
+                <a href="https://www.abs.gov.au/census/find-census-data/datapacks" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={14} className="inline align-baseline text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              , provided by the <span className="text-gray-900">Australian Bureau of Statistics</span>.
             </p>
             <p className="mb-3 text-gray-600">This dataset includes:</p>
             <ul className="mb-6 list-disc space-y-1.5 pl-5 text-gray-600">
@@ -73,7 +84,11 @@ function DataSourcesPage() {
               <li>Economic factors</li>
               <li>Cultural diversity</li>
               <li>Education levels</li>
-              <li>Socio-Economic Indexes for Areas (SEIFA) including relative advantage, disadvantage, economic resources and educational opportunity</li>
+              <li>Socio-Economic Indexes for Areas (SEIFA&nbsp;
+                <a href="https://www.abs.gov.au/statistics/people/people-and-communities/socio-economic-indexes-areas-seifa-australia/latest-release" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={14} className="inline align-baseline text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+                ) including relative advantage, disadvantage, economic resources and educational opportunity</li>
             </ul>
             <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
               <div className="flex gap-8">
@@ -85,12 +100,23 @@ function DataSourcesPage() {
                   <span className="text-gray-400">Data period</span>
                   <p className="text-gray-700">2021</p>
                 </div>
+                <div>
+                  <span className="text-gray-400">License</span>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
+                </div>
               </div>
             </div>
           </section>
 
           <section id="rental" className="mb-12 scroll-mt-24">
-            <h2 className="mb-4 text-2xl font-semibold text-gray-900">Rental Affordability</h2>
+            <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
+              Rental Affordability
+              <span>
+                <a href="https://www.dffh.vic.gov.au/affordable-lettings-local-government-area-june-quarter-2025-excel" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={18} className="text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              </span>
+            </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
               Historical data tracking the availability and affordability of rental properties across
               Victorian LGAs, provided by <span className="text-gray-900">Housing Victoria</span>.
@@ -111,12 +137,23 @@ function DataSourcesPage() {
                   <span className="text-gray-400">Data period</span>
                   <p className="text-gray-700">2000 – 2025</p>
                 </div>
+                <div>
+                  <span className="text-gray-400">License</span>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
+                </div>
               </div>
             </div>
           </section>
 
           <section id="house-prices" className="mb-12 scroll-mt-24">
-            <h2 className="mb-4 text-2xl font-semibold text-gray-900">Median House Prices</h2>
+            <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
+              Median House Prices
+              <span>
+                <a href="https://discover.data.vic.gov.au/dataset/victorian-property-sales-report-median-house-by-suburb" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={18} className="text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              </span>
+            </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
               Current median house price data for suburbs across Victoria,
               provided by <span className="text-gray-900">DataVic</span>.
@@ -136,12 +173,23 @@ function DataSourcesPage() {
                   <span className="text-gray-400">Data period</span>
                   <p className="text-gray-700">2024 – 2025</p>
                 </div>
+                <div>
+                  <span className="text-gray-400">License</span>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
+                </div>
               </div>
             </div>
           </section>
 
           <section id="schools" className="mb-12 scroll-mt-24">
-            <h2 className="mb-4 text-2xl font-semibold text-gray-900">Schools in Victoria</h2>
+            <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
+              Schools in Victoria
+              <span>
+                <a href="https://discover.data.vic.gov.au/dataset/school-locations-2025" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={18} className="text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              </span>
+            </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
               Locations and details of registered schools across Victoria to support analysis of
               education access, provided by <span className="text-gray-900">DataVic</span>.
@@ -162,12 +210,23 @@ function DataSourcesPage() {
                   <span className="text-gray-400">Data period</span>
                   <p className="text-gray-700">2024</p>
                 </div>
+                <div>
+                  <span className="text-gray-400">License</span>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
+                </div>
               </div>
             </div>
           </section>
 
           <section id="disasters" className="mb-12 scroll-mt-24">
-            <h2 className="mb-4 text-2xl font-semibold text-gray-900">National Disaster Activations</h2>
+            <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
+              National Disaster Activations
+              <span>
+                <a href="https://data.gov.au/data/dataset/drfa-activation-history-by-lga/resource/ada7908b-afe6-48f3-966b-789aa26c1391" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={18} className="text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              </span>
+            </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
               Event-level information on significant emergency incidents in Victoria,
               provided by the <span className="text-gray-900">National Emergency Management Agency</span>.
@@ -188,14 +247,25 @@ function DataSourcesPage() {
                   <span className="text-gray-400">Data period</span>
                   <p className="text-gray-700">2007 – 2025</p>
                 </div>
+                <div>
+                  <span className="text-gray-400">License</span>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/2.5/" target="_blank" rel="noopener noreferrer">CC BY 2.5</a></p>
+                </div>
               </div>
             </div>
           </section>
 
           <section id="crime" className="mb-12 scroll-mt-24">
-            <h2 className="mb-4 text-2xl font-semibold text-gray-900">Victorian Crime Statistics</h2>
+            <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
+              Victorian Crime Statistics
+              <span>
+                <a href="https://www.crimestatistics.vic.gov.au/crime-statistics/latest-victorian-crime-data/download-data" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={18} className="text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              </span>
+            </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
-              Recorded criminal offences across Victorian Local Government Areas,
+              Recorded criminal offences across Victorian LGAs,
               provided by the <span className="text-gray-900">Crime Statistics Agency</span>.
             </p>
             <p className="mb-3 text-gray-600">This dataset includes:</p>
@@ -213,6 +283,10 @@ function DataSourcesPage() {
                 <div>
                   <span className="text-gray-400">Data period</span>
                   <p className="text-gray-700">2024</p>
+                </div>
+                <div>
+                  <span className="text-gray-400">License</span>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
                 </div>
               </div>
             </div>
