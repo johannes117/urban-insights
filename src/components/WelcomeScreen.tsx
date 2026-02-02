@@ -2,10 +2,10 @@ import { Link } from "@tanstack/react-router"
 import { ChatInput } from "./ChatInput"
 
 const SUGGESTIONS = [
-  "Population distribution across LGAs",
-  "Compare median income by region",
-  "Top 10 LGAs by population",
-  "SEIFA disadvantage index",
+  "Are schools close to where I plan to live?",
+  "What challenges does my suburb face?",
+  "Where is renting more affordable?",
+  "How else can you help me?",
 ]
 
 function getTimeBasedGreeting(): string {
