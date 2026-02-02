@@ -10,7 +10,7 @@ interface ChatInputProps {
 export function ChatInput({
   onSendMessage,
   isLoading,
-  placeholder = "Ask about Victorian census data...",
+  placeholder = "Ask about livability in Victoria...",
 }: ChatInputProps) {
   const [input, setInput] = useState("")
 
