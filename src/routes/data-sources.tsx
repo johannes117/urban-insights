@@ -42,7 +42,7 @@ function DataSourcesPage() {
 
       <div className="flex justify-center px-6 py-12">
         <main className="w-full max-w-xl">
-          <div className="mb-2 text-sm font-medium text-emerald-600">Reference</div>
+          <div className="mb-2 text-sm font-medium text-cyan-600">Reference</div>
           <h1 className="mb-3 text-4xl font-bold text-gray-900">Data Sources</h1>
           <p className="mb-12 text-lg text-gray-500">
             Available datasets and their coverage across Victorian Local Government Areas.
