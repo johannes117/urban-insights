@@ -1,4 +1,5 @@
 import { useData } from '@json-render/react'
+import { resolveDataPath } from './useChartData'
 
 interface TableProps {
   element: {
@@ -13,13 +14,22 @@ export function Table({ element }: TableProps) {
   const { columns, dataPath } = element.props
   const { data } = useData()
 
-  const pathParts = dataPath.replace(/^\//, '').split('/')
-  let tableData = data as Record<string, unknown>
-  for (const part of pathParts) {
-    tableData = tableData?.[part] as Record<string, unknown>
-  }
+  const { data: rows, isEmpty, error } = resolveDataPath(
+    data as Record<string, unknown>,
+    dataPath,
+    'Table'
+  )
 
-  const rows = Array.isArray(tableData) ? tableData : []
+  if (isEmpty) {
+    return (
+      <div className="flex h-32 flex-col items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500">
+        <svg className="mb-2 h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <p className="text-sm">{error || 'No data available'}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -37,7 +47,7 @@ export function Table({ element }: TableProps) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 bg-white">
-          {rows.map((row, idx) => (
+          {(rows as unknown[]).map((row, idx) => (
             <tr key={idx} className="hover:bg-gray-50">
               {columns.map((col) => (
                 <td key={col} className="whitespace-nowrap px-4 py-3 text-sm text-gray-900">

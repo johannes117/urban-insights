@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useData } from '@json-render/react'
+import { resolveDataPath } from './useChartData'
 
 interface LineChartProps {
   element: {
@@ -24,39 +25,46 @@ export function LineChart({ element }: LineChartProps) {
   const { title, dataPath, xKey, yKey } = element.props
   const { data } = useData()
 
-  const pathParts = dataPath.replace(/^\//, '').split('/')
-  let chartData = data as Record<string, unknown>
-  for (const part of pathParts) {
-    chartData = chartData?.[part] as Record<string, unknown>
-  }
-
-  const items = Array.isArray(chartData) ? chartData : []
+  const { data: items, isEmpty, error } = resolveDataPath(
+    data as Record<string, unknown>,
+    dataPath,
+    'LineChart'
+  )
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
       <h3 className="mb-4 text-lg font-semibold text-gray-900">{title}</h3>
       <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <RechartsLineChart data={items} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey={xKey} tick={{ fill: '#6b7280', fontSize: 12 }} />
-            <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#fff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-              }}
-            />
-            <Line
-              type="monotone"
-              dataKey={yKey}
-              stroke="#111827"
-              strokeWidth={2}
-              dot={{ fill: '#111827', strokeWidth: 2 }}
-            />
-          </RechartsLineChart>
-        </ResponsiveContainer>
+        {isEmpty ? (
+          <div className="flex h-full flex-col items-center justify-center text-gray-500">
+            <svg className="mb-2 h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+            </svg>
+            <p className="text-sm">{error || 'No data available'}</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsLineChart data={items as unknown[]} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey={xKey} tick={{ fill: '#6b7280', fontSize: 12 }} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey={yKey}
+                stroke="#111827"
+                strokeWidth={2}
+                dot={{ fill: '#111827', strokeWidth: 2 }}
+              />
+            </RechartsLineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   )

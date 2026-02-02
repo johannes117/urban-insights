@@ -77,12 +77,17 @@ function extractQueryResults(messages: BaseMessage[]): QueryResult[] {
           const parsed = JSON.parse(content)
           if (parsed.success && parsed.resultKey && parsed.data) {
             results.push({ resultKey: parsed.resultKey, data: parsed.data })
+          } else if (parsed.error) {
+            console.warn('[extractQueryResults] Tool returned error:', parsed.error)
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[extractQueryResults] Failed to parse tool message:', e, 'Content preview:', content.slice(0, 200))
+        }
       }
     }
   }
 
+  console.log('[extractQueryResults] Extracted', results.length, 'query results:', results.map(r => r.resultKey))
   return results
 }
 

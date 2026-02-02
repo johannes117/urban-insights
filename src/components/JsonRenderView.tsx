@@ -45,6 +45,19 @@ function nestedToFlat(nested: NestedUIElement): UITree {
   }
 }
 
+function extractDataPathsFromUI(element: NestedUIElement): string[] {
+  const paths: string[] = []
+  if (element.props?.dataPath) {
+    paths.push(element.props.dataPath as string)
+  }
+  if (element.children) {
+    for (const child of element.children) {
+      paths.push(...extractDataPathsFromUI(child))
+    }
+  }
+  return paths
+}
+
 export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderViewProps) {
   const flatTree = nestedToFlat(ui)
 
@@ -53,8 +66,26 @@ export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderView
     for (const result of queryResults) {
       merged[result.resultKey] = result.data
     }
+
+    const requiredPaths = extractDataPathsFromUI(ui)
+    const availableKeys = Object.keys(merged)
+
+    for (const path of requiredPaths) {
+      const key = path.replace(/^\//, '').split('/')[0]
+      if (!availableKeys.includes(key)) {
+        console.warn(
+          `[JsonRenderView] UI requires dataPath "${path}" but key "${key}" not found in query results. Available keys:`,
+          availableKeys
+        )
+      }
+    }
+
+    if (requiredPaths.length > 0 && availableKeys.length === 0) {
+      console.warn('[JsonRenderView] UI has data paths but no query results were provided')
+    }
+
     return merged
-  }, [queryResults])
+  }, [queryResults, ui])
 
   const handleAction = (actionName: string) => {
     if (actionName === 'refresh') {
