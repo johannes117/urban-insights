@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
 import { WelcomeScreen } from '../components/WelcomeScreen'
+import { Sidebar } from '../components/Sidebar'
 import { streamMessage } from '../server/chat'
 import type { Message, NestedUIElement, QueryResult, StreamChunk, ToolCall, Report, Artifact } from '../lib/types'
 
@@ -183,48 +184,61 @@ function App() {
     setIsDragging(false)
   }
 
+  const handleNewChat = () => {
+    setMessages([])
+    setArtifactState({ items: [], index: -1 })
+  }
+
   if (!hasConversation) {
     return (
-      <WelcomeScreen
-        onSendMessage={handleSendMessage}
-        isLoading={isLoading}
-      />
+      <div className="flex h-screen">
+        <Sidebar onNewChat={handleNewChat} />
+        <div className="flex-1">
+          <WelcomeScreen
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+          />
+        </div>
+      </div>
     )
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative flex h-screen bg-gray-50 p-6 ${!hasArtifact ? 'justify-center' : ''}`}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-    >
+    <div className="flex h-screen">
+      <Sidebar onNewChat={handleNewChat} />
       <div
-        className={`min-w-0 ${hasArtifact ? 'mr-6' : 'w-full max-w-3xl'}`}
-        style={hasArtifact ? { width: `${chatWidthPercent}%` } : undefined}
+        ref={containerRef}
+        className={`relative flex flex-1 bg-gray-50 p-6 ${!hasArtifact ? 'justify-center' : ''}`}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       >
-        <ChatPanel
-          messages={messages}
-          isLoading={isLoading}
-          onSendMessage={handleSendMessage}
-        />
-      </div>
-      {hasArtifact && (
-        <div className="min-w-0 flex-1">
-          <ArtifactPanel
-            ui={currentArtifact?.ui ?? null}
-            report={currentArtifact?.report ?? null}
-            queryResults={currentArtifact?.queryResults ?? []}
-            onResizePointerDown={handlePointerDown}
-            isResizing={isDragging}
-            artifactCount={artifactState.items.length}
-            artifactIndex={artifactState.index}
-            onArtifactIndexChange={handleArtifactIndexChange}
+        <div
+          className={`min-w-0 ${hasArtifact ? 'mr-6' : 'w-full max-w-3xl'}`}
+          style={hasArtifact ? { width: `${chatWidthPercent}%` } : undefined}
+        >
+          <ChatPanel
+            messages={messages}
+            isLoading={isLoading}
+            onSendMessage={handleSendMessage}
           />
         </div>
-      )}
+        {hasArtifact && (
+          <div className="min-w-0 flex-1">
+            <ArtifactPanel
+              ui={currentArtifact?.ui ?? null}
+              report={currentArtifact?.report ?? null}
+              queryResults={currentArtifact?.queryResults ?? []}
+              onResizePointerDown={handlePointerDown}
+              isResizing={isDragging}
+              artifactCount={artifactState.items.length}
+              artifactIndex={artifactState.index}
+              onArtifactIndexChange={handleArtifactIndexChange}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

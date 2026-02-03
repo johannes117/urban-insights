@@ -25,7 +25,7 @@ export function WelcomeScreen({
   isLoading,
 }: WelcomeScreenProps) {
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center bg-gray-50 px-6">
+    <div className="relative flex h-full flex-col items-center justify-center bg-gray-50 px-6">
       <h1 className="mb-8 text-4xl font-light text-gray-900">
         {getTimeBasedGreeting()}
       </h1>
