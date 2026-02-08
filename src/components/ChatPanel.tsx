@@ -1,8 +1,8 @@
-import { useCallback } from "react"
+import { useCallback, useMemo } from "react"
 import Markdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
-import type { Message } from "../lib/types"
+import type { Message, ToolCall } from "../lib/types"
 import { ToolCallDisplay } from "./ToolCallDisplay"
 import { ChatInput } from "./ChatInput"
 
@@ -11,6 +11,10 @@ interface ChatPanelProps {
   isLoading: boolean
   onSendMessage: (message: string) => void
 }
+
+type GroupedEntry =
+  | { type: "message"; message: Message; index: number }
+  | { type: "tool_group"; toolCalls: ToolCall[]; lastIndex: number }
 
 export function ChatPanel({
   messages,
@@ -26,6 +30,28 @@ export function ChatPanel({
     [messages.length, isLoading],
   )
 
+  const grouped = useMemo(() => {
+    const result: GroupedEntry[] = []
+    let i = 0
+    while (i < messages.length) {
+      const msg = messages[i]
+      if (msg.role === "tool" && msg.toolCall) {
+        const toolCalls: ToolCall[] = []
+        let lastIdx = i
+        while (i < messages.length && messages[i].role === "tool" && messages[i].toolCall) {
+          toolCalls.push(messages[i].toolCall!)
+          lastIdx = i
+          i++
+        }
+        result.push({ type: "tool_group", toolCalls, lastIndex: lastIdx })
+      } else {
+        result.push({ type: "message", message: msg, index: i })
+        i++
+      }
+    }
+    return result
+  }, [messages])
+
   return (
     <div className="flex h-full flex-col bg-transparent">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 py-4">
@@ -35,18 +61,20 @@ export function ChatPanel({
           </div>
         )}
 
-        {messages.map((message, index) => {
-          const isLastMessage = index === messages.length - 1
-          const isStreaming =
-            isLastMessage && isLoading && message.role === "assistant"
-
-          if (message.role === "tool" && message.toolCall) {
+        {grouped.map((entry) => {
+          if (entry.type === "tool_group") {
+            const isLast = entry.lastIndex === messages.length - 1
             return (
-              <div key={message.id} ref={isLastMessage ? scrollAnchorRef : undefined}>
-                <ToolCallDisplay toolCalls={[message.toolCall]} />
+              <div key={`tool-group-${entry.lastIndex}`} ref={isLast ? scrollAnchorRef : undefined}>
+                <ToolCallDisplay toolCalls={entry.toolCalls} />
               </div>
             )
           }
+
+          const { message, index } = entry
+          const isLastMessage = index === messages.length - 1
+          const isStreaming =
+            isLastMessage && isLoading && message.role === "assistant"
 
           if (message.role === "assistant") {
             return (
