@@ -43,7 +43,7 @@ export function ChatPanel({
           if (message.role === "tool" && message.toolCall) {
             return (
               <div key={message.id} ref={isLastMessage ? scrollAnchorRef : undefined}>
-                <ToolCallDisplay toolCall={message.toolCall} />
+                <ToolCallDisplay toolCalls={[message.toolCall]} />
               </div>
             )
           }
