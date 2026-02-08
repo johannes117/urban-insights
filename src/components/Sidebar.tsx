@@ -20,10 +20,12 @@ function formatTimestamp(value: string): string {
 
   const now = new Date()
   const diffInMs = now.getTime() - date.getTime()
-  const diffInHours = Math.round(diffInMs / (1000 * 60 * 60))
+  const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
 
-  if (diffInHours <= 20) {
-    if (diffInHours <= 1) return 'Just now'
+  if (diffInHours < 24) {
+    if (diffInMinutes < 1) return 'Just now'
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`
     return `${diffInHours}h ago`
   }
 

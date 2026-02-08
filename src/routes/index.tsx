@@ -268,11 +268,13 @@ function App() {
 
     setSessions((prev) => {
       const existingSession = prev.find((session) => session.id === activeSessionId)
+      const hasNewContent = !existingSession || messages.length !== existingSession.messages.length
       const nextSnapshot = createChatSessionSnapshot({
         id: activeSessionId,
         messages,
         artifactState,
         createdAt: existingSession?.createdAt,
+        updatedAt: hasNewContent ? undefined : existingSession?.updatedAt,
       })
 
       return [nextSnapshot, ...prev.filter((session) => session.id !== activeSessionId)]
