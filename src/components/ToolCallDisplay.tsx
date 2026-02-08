@@ -1,143 +1,108 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Database, Search, LayoutGrid, Loader2 } from 'lucide-react'
+import { Check, ChevronRight, ChevronDown, Loader2 } from 'lucide-react'
 import type { ToolCall } from '../lib/types'
 
 interface ToolCallDisplayProps {
-  toolCall: ToolCall
+  toolCalls: ToolCall[]
 }
 
-const toolDisplayInfo: Record<string, { label: string; expandedLabel: string; icon: typeof Database }> = {
-  list_datasets: {
-    label: 'Listed datasets',
-    expandedLabel: 'Checking available datasets',
-    icon: Database,
-  },
-  get_dataset_schema: {
-    label: 'Got dataset schema',
-    expandedLabel: 'Getting dataset structure',
-    icon: Database,
-  },
-  query_dataset: {
-    label: 'Queried dataset',
-    expandedLabel: 'Running SQL query',
-    icon: Search,
-  },
-  render_ui: {
-    label: 'Rendered visualization',
-    expandedLabel: 'Creating visualization',
-    icon: LayoutGrid,
-  },
-  get_data: {
-    label: 'Fetched data',
-    expandedLabel: 'Fetching data',
-    icon: Database,
-  },
+
+const STEP_LABELS: Record<string, string> = {
+  list_datasets: 'Fetching data',
+  get_dataset_schema: 'Fetching data',
+  query_dataset: 'Gathering results',
+  render_ui: 'Creating visualization',
+  render_report: 'Generating report',
+  get_data: 'Fetching data',
 }
 
-function formatToolResult(result: unknown): string {
+const TOOL_LABELS: Record<string, string> = {
+  list_datasets: 'List datasets',
+  get_dataset_schema: 'Get schema',
+  query_dataset: 'Run query',
+  render_ui: 'Render visualization',
+  render_report: 'Render report',
+  get_data: 'Get data',
+}
+
+function formatResultSummary(result: unknown): string {
   if (result === null || result === undefined) return ''
   if (typeof result === 'string') {
     try {
-      const parsed = JSON.parse(result)
-      return formatParsedResult(parsed)
+      return formatParsedResult(JSON.parse(result))
     } catch {
-      return result.slice(0, 200) + (result.length > 200 ? '...' : '')
+      return result.slice(0, 80) + (result.length > 80 ? '...' : '')
     }
   }
   return formatParsedResult(result)
 }
 
 function formatParsedResult(parsed: unknown): string {
-  if (typeof parsed !== 'object' || parsed === null) {
-    return String(parsed).slice(0, 200)
-  }
-
+  if (typeof parsed !== 'object' || parsed === null) return String(parsed).slice(0, 80)
   const obj = parsed as Record<string, unknown>
-
-  if (obj.datasets && Array.isArray(obj.datasets)) {
-    return `Found ${obj.datasets.length} dataset(s)`
-  }
-
-  if (obj.columns && Array.isArray(obj.columns)) {
-    return `${obj.columns.length} columns, ${obj.totalRows || obj.rowCount || '?'} rows`
-  }
-
-  if (obj.data && Array.isArray(obj.data)) {
-    return `${obj.data.length} rows returned`
-  }
-
-  if (obj.success && obj.ui) {
-    return 'Visualization created'
-  }
-
-  if (obj.error) {
-    return `Error: ${String(obj.error).slice(0, 100)}`
-  }
-
-  return JSON.stringify(parsed).slice(0, 150) + '...'
+  if (obj.datasets && Array.isArray(obj.datasets)) return `Found ${obj.datasets.length} dataset(s)`
+  if (obj.columns && Array.isArray(obj.columns)) return `${obj.columns.length} columns, ${obj.totalRows ?? obj.rowCount ?? '?'} rows`
+  if (obj.data && Array.isArray(obj.data)) return `${obj.data.length} rows returned`
+  if (obj.success && obj.ui) return 'Visualization created'
+  if (obj.error) return `Error: ${String(obj.error).slice(0, 60)}`
+  return JSON.stringify(parsed).slice(0, 60) + '...'
 }
 
-function formatArgs(name: string, args: Record<string, unknown>): string {
-  if (name === 'query_dataset' && args.query) {
-    const query = String(args.query)
-    return query.length > 80 ? query.slice(0, 80) + '...' : query
-  }
-  if (name === 'get_dataset_schema' && args.datasetName) {
-    return String(args.datasetName)
-  }
-  if (name === 'get_data' && args.dataKey) {
-    return String(args.dataKey)
-  }
-  return ''
-}
+export function ToolCallDisplay({ toolCalls }: ToolCallDisplayProps) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
-export function ToolCallDisplay({ toolCall }: ToolCallDisplayProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  const info = toolDisplayInfo[toolCall.name] || {
-    label: toolCall.name,
-    expandedLabel: toolCall.name,
-    icon: Database,
+  const toggle = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
-  const Icon = info.icon
-  const isRunning = toolCall.status === 'running'
-  const displayLabel = isRunning ? info.expandedLabel : info.label
-  const argsDisplay = formatArgs(toolCall.name, toolCall.args)
+  if (toolCalls.length === 0) return null
 
   return (
     <div className="my-2">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-      >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
-        ) : (
-          <ChevronRight className="h-4 w-4" />
-        )}
-        {isRunning ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <Icon className="h-3.5 w-3.5" />
-        )}
-        <span>{displayLabel}</span>
-      </button>
-
-      {isExpanded && (
-        <div className="ml-5 mt-2 pl-3 border-l-2 border-gray-200 text-sm text-gray-600 space-y-2">
-          {argsDisplay && (
-            <div className="font-mono text-xs bg-gray-50 rounded px-2 py-1.5 text-gray-700 break-all">
-              {argsDisplay}
-            </div>
-          )}
-          {toolCall.status === 'complete' && toolCall.result !== undefined && (
-            <div className="text-gray-500">
-              {formatToolResult(toolCall.result)}
-            </div>
-          )}
-        </div>
-      )}
+      {toolCalls.map((tc) => {
+        const running = tc.status === 'running'
+        const stepLabel = STEP_LABELS[tc.name] ?? 'Fetching data'
+        const isExpanded = expandedIds.has(tc.id)
+        const toolLabel = TOOL_LABELS[tc.name] ?? tc.name
+        const summary =
+          tc.status === 'complete' && tc.result !== undefined
+            ? formatResultSummary(tc.result)
+            : tc.status === 'running'
+              ? 'Running...'
+              : 'Pending'
+        return (
+          <div key={tc.id} className="my-1">
+            <button
+              type="button"
+              onClick={() => toggle(tc.id)}
+              className="flex w-full items-center gap-1.5 text-left text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-4 w-4 shrink-0" />
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0" />
+              )}
+              {running ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+              ) : (
+                <Check className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span>{stepLabel}</span>
+            </button>
+            {isExpanded && (
+              <div className="ml-5 mt-1 pl-3 border-l-2 border-gray-200 text-sm text-gray-600">
+                <span className="font-medium text-gray-700">{toolLabel}</span>
+                {summary && <span className="text-gray-500"> — {summary}</span>}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
