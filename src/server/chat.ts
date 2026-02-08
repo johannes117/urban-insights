@@ -4,6 +4,7 @@ import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { UIElement } from '@json-render/core'
 import type { NestedUIElement, QueryResult, Report } from '../lib/types'
 import type { BaseMessage } from '@langchain/core/messages'
+import { executeDatasetQuery } from '../lib/datasetTools'
 
 type StreamTextChunk = { type: 'text'; content: string }
 type StreamToolStartChunk = { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
@@ -64,6 +65,29 @@ function extractTextContent(messages: BaseMessage[]): string {
 }
 
 function extractQueryResults(messages: BaseMessage[]): QueryResult[] {
+  const queryByToolCallId = new Map<string, { resultKey?: string; query?: string }>()
+  const queryByResultKey = new Map<string, string>()
+
+  for (const msg of messages) {
+    const toolCalls = extractToolCallsFromMessage(msg)
+    for (const tc of toolCalls) {
+      if (tc.name !== 'query_dataset') continue
+
+      const resultKey =
+        typeof tc.args.resultKey === 'string' ? tc.args.resultKey : undefined
+      const query =
+        typeof tc.args.query === 'string' ? tc.args.query : undefined
+
+      if (resultKey && query) {
+        queryByResultKey.set(resultKey, query)
+      }
+
+      if (tc.id) {
+        queryByToolCallId.set(tc.id, { resultKey, query })
+      }
+    }
+  }
+
   const results: QueryResult[] = []
 
   for (const msg of messages) {
@@ -71,12 +95,22 @@ function extractQueryResults(messages: BaseMessage[]): QueryResult[] {
     const msgType = msgAny.type || msgAny._type || (msg.constructor as { name?: string })?.name
 
     if (msgType === 'tool' || msgType === 'ToolMessage') {
+      const toolCallId = typeof msgAny.tool_call_id === 'string' ? msgAny.tool_call_id : undefined
       const content = msg.content
       if (typeof content === 'string') {
         try {
           const parsed = JSON.parse(content)
           if (parsed.success && parsed.resultKey && parsed.data) {
-            results.push({ resultKey: parsed.resultKey, data: parsed.data })
+            const query =
+              (typeof parsed.query === 'string' ? parsed.query : undefined) ??
+              queryByToolCallId.get(toolCallId ?? '')?.query ??
+              queryByResultKey.get(parsed.resultKey)
+
+            results.push({
+              resultKey: parsed.resultKey,
+              data: parsed.data,
+              query,
+            })
           } else if (parsed.error) {
             console.warn('[extractQueryResults] Tool returned error:', parsed.error)
           }
@@ -130,12 +164,55 @@ interface SendMessageInput {
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
 }
 
+interface RehydrateQueriesInput {
+  queries: Array<{ resultKey: string; query: string }>
+}
+
 export interface SendMessageResult {
   success: boolean
   response: string
   ui: NestedUIElement | null
   queryResults: QueryResult[]
 }
+
+export const rehydrateQueryResults = createServerFn({ method: 'POST' })
+  .inputValidator((d: RehydrateQueriesInput) => d)
+  .handler(async ({ data }) => {
+    const dedupedQueries = new Map<string, string>()
+
+    for (const item of data.queries) {
+      const resultKey = item.resultKey?.trim()
+      const query = item.query?.trim()
+      if (!resultKey || !query) continue
+      dedupedQueries.set(resultKey, query)
+    }
+
+    const queryResults: QueryResult[] = []
+    const errors: Array<{ resultKey: string; error: string }> = []
+
+    for (const [resultKey, query] of dedupedQueries.entries()) {
+      const result = await executeDatasetQuery({ query, resultKey })
+
+      if ('success' in result && result.success) {
+        queryResults.push({
+          resultKey: result.resultKey,
+          data: result.data,
+          query: result.query ?? query,
+        })
+      } else {
+        errors.push({
+          resultKey,
+          error: result.error,
+        })
+      }
+    }
+
+    return {
+      success: true,
+      queryResults,
+      errors,
+    }
+  })
 
 export const sendMessage = createServerFn({ method: 'POST' })
   .inputValidator((d: SendMessageInput) => d)

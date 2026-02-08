@@ -164,59 +164,8 @@ function extractTableFromQuery(query: string): string | null {
 
 export const queryDatasetTool = tool(
   async ({ query, resultKey }) => {
-    const validation = validateSelectQuery(query)
-    if (!validation.valid) {
-      return JSON.stringify({ error: validation.error })
-    }
-
-    const tableName = extractTableFromQuery(query)
-    if (!tableName) {
-      return JSON.stringify({ error: 'Could not parse table name from query. Ensure your query has a valid FROM clause.' })
-    }
-
-    const availableTables = await getAvailableTables()
-    const tableNameLower = tableName.toLowerCase()
-
-    if (!availableTables.has(tableNameLower)) {
-      const tableNames = Array.from(availableTables.keys())
-      return JSON.stringify({
-        error: `Table "${tableName}" not found.`,
-        availableTables: tableNames,
-        hint: 'Use the exact tableName from get_dataset_schema (e.g., "dataset_sales_2024"). Did you call get_dataset_schema first?',
-      })
-    }
-
-    const tableInfo = availableTables.get(tableNameLower)!
-
-    try {
-      const sql = getSql()
-      const rows = await sql.query(query, [])
-
-      return JSON.stringify({
-        success: true,
-        resultKey,
-        rowCount: rows.length,
-        columns: rows.length > 0 ? Object.keys(rows[0]) : [],
-        data: rows,
-      })
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err)
-
-      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
-        const exampleCols = tableInfo.originalColumns.slice(0, 5).map(c => `"${c}"`).join(', ')
-        return JSON.stringify({
-          error: `Query failed: ${errorMessage}`,
-          correctColumnNames: tableInfo.originalColumns,
-          exampleQuery: `SELECT ${exampleCols} FROM "${tableName}" LIMIT 10`,
-          hint: 'COPY column names exactly as shown in correctColumnNames. Use double quotes around column names.',
-        })
-      }
-
-      return JSON.stringify({
-        error: `Query failed: ${errorMessage}`,
-        hint: 'Check that you are using the exact tableName and column names from get_dataset_schema.',
-      })
-    }
+    const result = await executeDatasetQuery({ query, resultKey })
+    return JSON.stringify(result)
   },
   {
     name: 'query_dataset',
@@ -229,5 +178,87 @@ The resultKey becomes the dataPath in render_ui (e.g., resultKey "sales" -> data
     }),
   }
 )
+
+interface ExecuteDatasetQueryInput {
+  query: string
+  resultKey: string
+}
+
+type ExecuteDatasetQueryResult =
+  | {
+      success: true
+      resultKey: string
+      query: string
+      rowCount: number
+      columns: string[]
+      data: Record<string, unknown>[]
+    }
+  | {
+      error: string
+      availableTables?: string[]
+      hint?: string
+      correctColumnNames?: string[]
+      exampleQuery?: string
+    }
+
+export async function executeDatasetQuery({
+  query,
+  resultKey,
+}: ExecuteDatasetQueryInput): Promise<ExecuteDatasetQueryResult> {
+    const validation = validateSelectQuery(query)
+    if (!validation.valid) {
+      return { error: validation.error ?? 'Invalid query' }
+    }
+
+    const tableName = extractTableFromQuery(query)
+    if (!tableName) {
+      return { error: 'Could not parse table name from query. Ensure your query has a valid FROM clause.' }
+    }
+
+    const availableTables = await getAvailableTables()
+    const tableNameLower = tableName.toLowerCase()
+
+    if (!availableTables.has(tableNameLower)) {
+      const tableNames = Array.from(availableTables.keys())
+      return {
+        error: `Table "${tableName}" not found.`,
+        availableTables: tableNames,
+        hint: 'Use the exact tableName from get_dataset_schema (e.g., "dataset_sales_2024"). Did you call get_dataset_schema first?',
+      }
+    }
+
+    const tableInfo = availableTables.get(tableNameLower)!
+
+    try {
+      const sql = getSql()
+      const rows = await sql.query(query, [])
+
+      return {
+        success: true,
+        resultKey,
+        query,
+        rowCount: rows.length,
+        columns: rows.length > 0 ? Object.keys(rows[0]) : [],
+        data: rows as Record<string, unknown>[],
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err)
+
+      if (errorMessage.includes('column') && errorMessage.includes('does not exist')) {
+        const exampleCols = tableInfo.originalColumns.slice(0, 5).map(c => `"${c}"`).join(', ')
+        return {
+          error: `Query failed: ${errorMessage}`,
+          correctColumnNames: tableInfo.originalColumns,
+          exampleQuery: `SELECT ${exampleCols} FROM "${tableName}" LIMIT 10`,
+          hint: 'COPY column names exactly as shown in correctColumnNames. Use double quotes around column names.',
+        }
+      }
+
+      return {
+        error: `Query failed: ${errorMessage}`,
+        hint: 'Check that you are using the exact tableName and column names from get_dataset_schema.',
+      }
+    }
+}
 
 export const datasetTools = [listDatasetsTool, getDatasetSchemaTool, queryDatasetTool]
