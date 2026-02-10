@@ -42,6 +42,15 @@ export function ReportPreview({ report, queryResults }: ReportPreviewProps) {
               margin: 0 auto;
             }
 
+            .report-logo {
+              margin-bottom: 24px;
+            }
+            .report-logo img {
+              height: 48px;
+              width: auto;
+              max-height: 56px;
+              object-fit: contain;
+            }
             .report-header {
               margin-bottom: 32px;
               padding-bottom: 24px;
@@ -182,6 +191,9 @@ export function ReportPreview({ report, queryResults }: ReportPreviewProps) {
               body {
                 padding: 20px;
               }
+              .report-logo {
+                break-inside: avoid;
+              }
               .chart-container {
                 break-inside: avoid;
               }
@@ -227,6 +239,13 @@ export function ReportPreview({ report, queryResults }: ReportPreviewProps) {
           ref={reportRef}
           className="mx-auto max-w-3xl rounded-lg bg-white p-8 shadow-sm"
         >
+          <div className="report-logo mb-6">
+            <img
+              src={`${typeof window !== 'undefined' ? window.location.origin : ''}/images/urban-insights-logo.png`}
+              alt="Urban Insights"
+              className="h-12 w-auto max-h-14 object-contain"
+            />
+          </div>
           <div className="report-header mb-8 border-b-2 border-gray-200 pb-6">
             <h1 className="report-title mb-2 text-2xl font-bold text-gray-900">
               {report.title}
