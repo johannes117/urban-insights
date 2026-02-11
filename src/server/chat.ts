@@ -1,14 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
-import { createAgent } from '../lib/agent'
+import { createAgent, createModel } from '../lib/agent'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { UIElement } from '@json-render/core'
 import type { NestedUIElement, QueryResult, Report } from '../lib/types'
 import type { BaseMessage } from '@langchain/core/messages'
+import { executeDatasetQuery } from '../lib/datasetTools'
 
 type StreamTextChunk = { type: 'text'; content: string }
 type StreamToolStartChunk = { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
 type StreamToolEndChunk = { type: 'tool_end'; toolCallId: string; result: {} }
-type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[]; report: Report | null }
+type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[]; report: Report | null; suggestions?: string[] }
 type StreamChunk = StreamTextChunk | StreamToolStartChunk | StreamToolEndChunk | StreamDoneChunk
 
 function extractUiFromMessages(messages: BaseMessage[]): UIElement | null {
@@ -64,6 +65,29 @@ function extractTextContent(messages: BaseMessage[]): string {
 }
 
 function extractQueryResults(messages: BaseMessage[]): QueryResult[] {
+  const queryByToolCallId = new Map<string, { resultKey?: string; query?: string }>()
+  const queryByResultKey = new Map<string, string>()
+
+  for (const msg of messages) {
+    const toolCalls = extractToolCallsFromMessage(msg)
+    for (const tc of toolCalls) {
+      if (tc.name !== 'query_dataset') continue
+
+      const resultKey =
+        typeof tc.args.resultKey === 'string' ? tc.args.resultKey : undefined
+      const query =
+        typeof tc.args.query === 'string' ? tc.args.query : undefined
+
+      if (resultKey && query) {
+        queryByResultKey.set(resultKey, query)
+      }
+
+      if (tc.id) {
+        queryByToolCallId.set(tc.id, { resultKey, query })
+      }
+    }
+  }
+
   const results: QueryResult[] = []
 
   for (const msg of messages) {
@@ -71,12 +95,22 @@ function extractQueryResults(messages: BaseMessage[]): QueryResult[] {
     const msgType = msgAny.type || msgAny._type || (msg.constructor as { name?: string })?.name
 
     if (msgType === 'tool' || msgType === 'ToolMessage') {
+      const toolCallId = typeof msgAny.tool_call_id === 'string' ? msgAny.tool_call_id : undefined
       const content = msg.content
       if (typeof content === 'string') {
         try {
           const parsed = JSON.parse(content)
           if (parsed.success && parsed.resultKey && parsed.data) {
-            results.push({ resultKey: parsed.resultKey, data: parsed.data })
+            const query =
+              (typeof parsed.query === 'string' ? parsed.query : undefined) ??
+              queryByToolCallId.get(toolCallId ?? '')?.query ??
+              queryByResultKey.get(parsed.resultKey)
+
+            results.push({
+              resultKey: parsed.resultKey,
+              data: parsed.data,
+              query,
+            })
           } else if (parsed.error) {
             console.warn('[extractQueryResults] Tool returned error:', parsed.error)
           }
@@ -125,9 +159,44 @@ function extractReportFromMessages(messages: BaseMessage[]): Report | null {
   return null
 }
 
+async function generateSuggestions(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string[]> {
+  const model = createModel()
+  const lastMessages = history.slice(-6)
+  const conversationText = lastMessages
+    .map((m) => `${m.role}: ${m.content}`)
+    .join('\n')
+
+  const response = await model.invoke([
+    new HumanMessage(
+      `Based on this conversation, suggest 2-3 short follow-up questions the user might ask next. Each must be under 60 characters. Return ONLY a JSON array of strings, no other text.\n\nConversation:\n${conversationText}`
+    ),
+  ])
+
+  const text = typeof response.content === 'string'
+    ? response.content
+    : Array.isArray(response.content)
+      ? (response.content.find(
+          (b): b is { type: 'text'; text: string } =>
+            typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
+        )?.text ?? '')
+      : ''
+
+  const match = text.match(/\[[\s\S]*\]/)
+  if (!match) return []
+  const parsed = JSON.parse(match[0])
+  if (!Array.isArray(parsed)) return []
+  return parsed.filter((s): s is string => typeof s === 'string').slice(0, 3)
+}
+
 interface SendMessageInput {
   message: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
+}
+
+interface RehydrateQueriesInput {
+  queries: Array<{ resultKey: string; query: string }>
 }
 
 export interface SendMessageResult {
@@ -136,6 +205,45 @@ export interface SendMessageResult {
   ui: NestedUIElement | null
   queryResults: QueryResult[]
 }
+
+export const rehydrateQueryResults = createServerFn({ method: 'POST' })
+  .inputValidator((d: RehydrateQueriesInput) => d)
+  .handler(async ({ data }) => {
+    const dedupedQueries = new Map<string, string>()
+
+    for (const item of data.queries) {
+      const resultKey = item.resultKey?.trim()
+      const query = item.query?.trim()
+      if (!resultKey || !query) continue
+      dedupedQueries.set(resultKey, query)
+    }
+
+    const queryResults: QueryResult[] = []
+    const errors: Array<{ resultKey: string; error: string }> = []
+
+    for (const [resultKey, query] of dedupedQueries.entries()) {
+      const result = await executeDatasetQuery({ query, resultKey })
+
+      if ('success' in result && result.success) {
+        queryResults.push({
+          resultKey: result.resultKey,
+          data: result.data,
+          query: result.query ?? query,
+        })
+      } else if ('error' in result) {
+        errors.push({
+          resultKey,
+          error: result.error,
+        })
+      }
+    }
+
+    return {
+      success: true,
+      queryResults,
+      errors,
+    }
+  })
 
 export const sendMessage = createServerFn({ method: 'POST' })
   .inputValidator((d: SendMessageInput) => d)
@@ -323,11 +431,24 @@ export const streamMessage = createServerFn({ method: 'POST' })
       const queryResults = extractQueryResults(finalMessages)
       const report = extractReportFromMessages(finalMessages)
 
+      let suggestions: string[] | undefined
+      try {
+        const history = [
+          ...(data.history ?? []),
+          { role: 'user' as const, content: data.message },
+          { role: 'assistant' as const, content: extractTextContent(finalMessages) },
+        ]
+        suggestions = await generateSuggestions(history)
+      } catch (e) {
+        console.warn('Failed to generate suggestions:', e)
+      }
+
       yield {
         type: 'done',
         ui: (ui as NestedUIElement | null) ?? null,
         queryResults,
         report,
+        suggestions,
       } satisfies StreamDoneChunk
     } catch (error) {
       console.error('Agent streaming error:', error)

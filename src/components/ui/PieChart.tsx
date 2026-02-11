@@ -48,7 +48,7 @@ export function PieChart({ element }: PieChartProps) {
           <ResponsiveContainer width="100%" height="100%">
             <RechartsPieChart>
               <Pie
-                data={items as unknown[]}
+                data={items as Record<string, unknown>[]}
                 dataKey={valueKey}
                 nameKey={nameKey}
                 cx="50%"

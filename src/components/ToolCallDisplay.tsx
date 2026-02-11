@@ -1,141 +1,69 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Database, Search, LayoutGrid, Loader2 } from 'lucide-react'
+import { Check, ChevronRight, ChevronDown, Loader2 } from 'lucide-react'
 import type { ToolCall } from '../lib/types'
 
 interface ToolCallDisplayProps {
-  toolCall: ToolCall
+  toolCalls: ToolCall[]
 }
 
-const toolDisplayInfo: Record<string, { label: string; expandedLabel: string; icon: typeof Database }> = {
-  list_datasets: {
-    label: 'Listed datasets',
-    expandedLabel: 'Checking available datasets',
-    icon: Database,
-  },
-  get_dataset_schema: {
-    label: 'Got dataset schema',
-    expandedLabel: 'Getting dataset structure',
-    icon: Database,
-  },
-  query_dataset: {
-    label: 'Queried dataset',
-    expandedLabel: 'Running SQL query',
-    icon: Search,
-  },
-  render_ui: {
-    label: 'Rendered visualization',
-    expandedLabel: 'Creating visualization',
-    icon: LayoutGrid,
-  },
-  get_data: {
-    label: 'Fetched data',
-    expandedLabel: 'Fetching data',
-    icon: Database,
-  },
+const STEP_LABELS: Record<string, string> = {
+  list_datasets: 'Checked data sources',
+  get_dataset_schema: 'Read data structure',
+  query_dataset: 'Queried data',
+  render_ui: 'Created visualization',
+  render_report: 'Generated report',
+  get_data: 'Retrieved data',
 }
 
-function formatToolResult(result: unknown): string {
-  if (result === null || result === undefined) return ''
-  if (typeof result === 'string') {
-    try {
-      const parsed = JSON.parse(result)
-      return formatParsedResult(parsed)
-    } catch {
-      return result.slice(0, 200) + (result.length > 200 ? '...' : '')
-    }
-  }
-  return formatParsedResult(result)
-}
+export function ToolCallDisplay({ toolCalls }: ToolCallDisplayProps) {
+  const [expanded, setExpanded] = useState(false)
 
-function formatParsedResult(parsed: unknown): string {
-  if (typeof parsed !== 'object' || parsed === null) {
-    return String(parsed).slice(0, 200)
-  }
+  if (toolCalls.length === 0) return null
 
-  const obj = parsed as Record<string, unknown>
-
-  if (obj.datasets && Array.isArray(obj.datasets)) {
-    return `Found ${obj.datasets.length} dataset(s)`
-  }
-
-  if (obj.columns && Array.isArray(obj.columns)) {
-    return `${obj.columns.length} columns, ${obj.totalRows || obj.rowCount || '?'} rows`
-  }
-
-  if (obj.data && Array.isArray(obj.data)) {
-    return `${obj.data.length} rows returned`
-  }
-
-  if (obj.success && obj.ui) {
-    return 'Visualization created'
-  }
-
-  if (obj.error) {
-    return `Error: ${String(obj.error).slice(0, 100)}`
-  }
-
-  return JSON.stringify(parsed).slice(0, 150) + '...'
-}
-
-function formatArgs(name: string, args: Record<string, unknown>): string {
-  if (name === 'query_dataset' && args.query) {
-    const query = String(args.query)
-    return query.length > 80 ? query.slice(0, 80) + '...' : query
-  }
-  if (name === 'get_dataset_schema' && args.datasetName) {
-    return String(args.datasetName)
-  }
-  if (name === 'get_data' && args.dataKey) {
-    return String(args.dataKey)
-  }
-  return ''
-}
-
-export function ToolCallDisplay({ toolCall }: ToolCallDisplayProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  const info = toolDisplayInfo[toolCall.name] || {
-    label: toolCall.name,
-    expandedLabel: toolCall.name,
-    icon: Database,
-  }
-
-  const Icon = info.icon
-  const isRunning = toolCall.status === 'running'
-  const displayLabel = isRunning ? info.expandedLabel : info.label
-  const argsDisplay = formatArgs(toolCall.name, toolCall.args)
+  const allComplete = toolCalls.every((tc) => tc.status === 'complete')
+  const names = new Set(toolCalls.map((tc) => tc.name))
+  const groupLabel = names.has('render_ui')
+    ? allComplete ? 'Created visualization' : 'Creating visualization...'
+    : names.has('render_report')
+      ? allComplete ? 'Generated report' : 'Generating report...'
+      : allComplete ? 'Explored' : 'Exploring...'
 
   return (
     <div className="my-2">
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
         className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
       >
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4" />
+        {expanded ? (
+          <ChevronDown className="h-4 w-4 shrink-0" />
         ) : (
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-4 w-4 shrink-0" />
         )}
-        {isRunning ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        {allComplete ? (
+          <Check className="h-3.5 w-3.5 shrink-0" />
         ) : (
-          <Icon className="h-3.5 w-3.5" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
         )}
-        <span>{displayLabel}</span>
+        <span>{groupLabel}</span>
       </button>
 
-      {isExpanded && (
-        <div className="ml-5 mt-2 pl-3 border-l-2 border-gray-200 text-sm text-gray-600 space-y-2">
-          {argsDisplay && (
-            <div className="font-mono text-xs bg-gray-50 rounded px-2 py-1.5 text-gray-700 break-all">
-              {argsDisplay}
-            </div>
-          )}
-          {toolCall.status === 'complete' && toolCall.result !== undefined && (
-            <div className="text-gray-500">
-              {formatToolResult(toolCall.result)}
-            </div>
-          )}
+      {expanded && (
+        <div className="ml-5 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
+          {toolCalls.map((tc) => {
+            const label = STEP_LABELS[tc.name] ?? tc.name
+            const done = tc.status === 'complete'
+            return (
+              <div key={tc.id} className="flex items-center gap-1.5 text-sm text-gray-600">
+                {done ? (
+                  <Check className="h-3 w-3 shrink-0 text-gray-400" />
+                ) : (
+                  <Loader2 className="h-3 w-3 animate-spin shrink-0 text-gray-400" />
+                )}
+                <span>{label}</span>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
