@@ -7,6 +7,7 @@ A web application developed by Team 1 that synthesises urban liveability data to
 ```bash
 bun install
 bun run dev
+npm test
 ```
 
 The app will be available at http://localhost:3000.
