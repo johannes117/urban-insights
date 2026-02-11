@@ -1,23 +1,29 @@
-import { ChatAnthropic } from '@langchain/anthropic'
-import { ChatGroq } from '@langchain/groq'
-import { tool } from '@langchain/core/tools'
-import { z } from 'zod/v3'
-import { StateGraph, MessagesAnnotation, END } from '@langchain/langgraph'
-import { ToolNode } from '@langchain/langgraph/prebuilt'
-import { SystemMessage, HumanMessage, AIMessage, BaseMessage, ToolMessage } from '@langchain/core/messages'
-import { datasetTools } from './datasetTools'
+import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatGroq } from "@langchain/groq";
+import { tool } from "@langchain/core/tools";
+import { z } from "zod/v3";
+import { StateGraph, MessagesAnnotation, END } from "@langchain/langgraph";
+import { ToolNode } from "@langchain/langgraph/prebuilt";
+import {
+  SystemMessage,
+  HumanMessage,
+  AIMessage,
+  BaseMessage,
+  ToolMessage,
+} from "@langchain/core/messages";
+import { datasetTools } from "./datasetTools";
 
 function createModel() {
   if (process.env.GROQ_API_KEY) {
     return new ChatGroq({
-      model: 'moonshotai/kimi-k2-instruct-0905',
+      model: "moonshotai/kimi-k2-instruct-0905",
       apiKey: process.env.GROQ_API_KEY,
-    })
+    });
   }
   return new ChatAnthropic({
-    model: 'claude-sonnet-4-5-20250929',
+    model: "claude-haiku-4-5-20251001",
     apiKey: process.env.ANTHROPIC_API_KEY,
-  })
+  });
 }
 
 const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
@@ -25,15 +31,15 @@ const uiElementSchema: z.ZodType<unknown> = z.lazy(() =>
     type: z.string(),
     props: z.record(z.unknown()).optional(),
     children: z.array(uiElementSchema).optional(),
-  })
-)
+  }),
+);
 
 const renderUiTool = tool(
   async ({ ui }) => {
-    return JSON.stringify({ success: true, ui })
+    return JSON.stringify({ success: true, ui });
   },
   {
-    name: 'render_ui',
+    name: "render_ui",
     description: `Render a visualization in the artifact panel.
 
 UI COMPONENTS:
@@ -47,24 +53,24 @@ UI COMPONENTS:
 
 dataPath should be "/" + the resultKey from query_dataset (e.g., "/sales")`,
     schema: z.object({
-      ui: uiElementSchema.describe('The UI tree to render'),
+      ui: uiElementSchema.describe("The UI tree to render"),
     }),
-  }
-)
+  },
+);
 
 const reportSectionSchema = z.object({
-  type: z.enum(['text', 'chart', 'table', 'metric']),
+  type: z.enum(["text", "chart", "table", "metric"]),
   title: z.string().optional(),
   content: z.string().optional(),
   dataPath: z.string().optional(),
-  chartType: z.enum(['bar', 'line', 'pie']).optional(),
+  chartType: z.enum(["bar", "line", "pie"]).optional(),
   xKey: z.string().optional(),
   yKey: z.string().optional(),
   nameKey: z.string().optional(),
   valueKey: z.string().optional(),
   columns: z.array(z.string()).optional(),
   source: z.string().optional(),
-})
+});
 
 const reportSchema = z.object({
   title: z.string(),
@@ -76,14 +82,14 @@ const reportSchema = z.object({
   callToAction: z.string(),
   closing: z.string(),
   sources: z.array(z.string()),
-})
+});
 
 const renderReportTool = tool(
   async ({ report }) => {
-    return JSON.stringify({ success: true, report })
+    return JSON.stringify({ success: true, report });
   },
   {
-    name: 'render_report',
+    name: "render_report",
     description: `Generate a formal report that the user can export as PDF to send to their local council member or representative.
 
 Use this tool when the user wants to:
@@ -123,10 +129,10 @@ GUIDELINES:
 - Use charts to illustrate trends and comparisons
 - Always cite data sources`,
     schema: z.object({
-      report: reportSchema.describe('The report content'),
+      report: reportSchema.describe("The report content"),
     }),
-  }
-)
+  },
+);
 
 function buildSystemPrompt(): string {
   return `You are a data exploration assistant helping users understand and analyze datasets about their local government area (LGA). Your role is to answer questions, find insights, and help users explore their data through conversation. You can also help users create formal reports to send to their local council members or representatives.
@@ -173,42 +179,49 @@ Remember: Users may not know what data is available or relevant. Proactively sug
 RESPONSE STYLE:
 - Be concise but informative
 - Lead with the answer/insight, then provide supporting details
-- No emojis`
+- No emojis`;
 }
 
-const allTools = [renderUiTool, renderReportTool, ...datasetTools]
+const allTools = [renderUiTool, renderReportTool, ...datasetTools];
 
-function shouldContinue(state: typeof MessagesAnnotation.State): 'tools' | typeof END {
-  const lastMessage = state.messages[state.messages.length - 1]
-  if (lastMessage && 'tool_calls' in lastMessage && Array.isArray(lastMessage.tool_calls) && lastMessage.tool_calls.length > 0) {
-    return 'tools'
+function shouldContinue(
+  state: typeof MessagesAnnotation.State,
+): "tools" | typeof END {
+  const lastMessage = state.messages[state.messages.length - 1];
+  if (
+    lastMessage &&
+    "tool_calls" in lastMessage &&
+    Array.isArray(lastMessage.tool_calls) &&
+    lastMessage.tool_calls.length > 0
+  ) {
+    return "tools";
   }
-  return END
+  return END;
 }
 
 export function createAgent() {
-  const model = createModel().bindTools(allTools)
-  const systemPrompt = buildSystemPrompt()
+  const model = createModel().bindTools(allTools);
+  const systemPrompt = buildSystemPrompt();
 
   async function callModel(state: typeof MessagesAnnotation.State) {
     const messagesWithSystem = [
       new SystemMessage(systemPrompt),
       ...state.messages,
-    ]
-    const response = await model.invoke(messagesWithSystem)
-    return { messages: [response] }
+    ];
+    const response = await model.invoke(messagesWithSystem);
+    return { messages: [response] };
   }
 
-  const toolNode = new ToolNode(allTools)
+  const toolNode = new ToolNode(allTools);
 
   const graph = new StateGraph(MessagesAnnotation)
-    .addNode('agent', callModel)
-    .addNode('tools', toolNode)
-    .addEdge('__start__', 'agent')
-    .addConditionalEdges('agent', shouldContinue)
-    .addEdge('tools', 'agent')
+    .addNode("agent", callModel)
+    .addNode("tools", toolNode)
+    .addEdge("__start__", "agent")
+    .addConditionalEdges("agent", shouldContinue)
+    .addEdge("tools", "agent");
 
-  return graph.compile()
+  return graph.compile();
 }
 
-export type Agent = ReturnType<typeof createAgent>
+export type Agent = ReturnType<typeof createAgent>;
