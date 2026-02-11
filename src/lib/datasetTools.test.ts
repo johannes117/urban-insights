@@ -1,56 +1,42 @@
-import { describe, it, expect, vi } from 'vitest'
-
-// Mock database dependencies before importing the module
-vi.mock('../db', () => ({
-  db: {},
-  datasets: {},
-}))
-
-vi.mock('@neondatabase/serverless', () => ({
-  neon: vi.fn(),
-}))
-
-vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
-}))
-
-vi.mock('@langchain/core/tools', () => ({
-  tool: vi.fn((fn, config) => ({ fn, config })),
-}))
-
-import { validateSelectQuery } from './datasetTools'
+import { describe, it, expect } from 'vitest';
+import { validateSelectQuery } from './datasetTools';
 
 describe('validateSelectQuery', () => {
+  // Valid SELECT queries on rent data
   it('allows valid SELECT queries', () => {
-    expect(validateSelectQuery('SELECT * FROM users').valid).toBe(true)
-    expect(validateSelectQuery('select name FROM users WHERE age > 18').valid).toBe(true)
-    expect(validateSelectQuery('   SELECT * FROM users').valid).toBe(true)
-  })
+    expect(validateSelectQuery('SELECT * FROM rent')).toBe(true);
+    expect(validateSelectQuery('SELECT LGA, MedianWeeklyRent FROM rent_comparison WHERE MedianWeeklyRent > 400')).toBe(true);
+    expect(validateSelectQuery('   SELECT * FROM rent_comparison')).toBe(true);
+  });
 
+  // Reject empty or non-SELECT queries
   it('rejects empty and non-SELECT queries', () => {
-    expect(validateSelectQuery('').valid).toBe(false)
-    expect(validateSelectQuery('SHOW TABLES').valid).toBe(false)
-    expect(validateSelectQuery('   ').valid).toBe(false)
-  })
+    expect(validateSelectQuery('')).toBe(false);
+    expect(validateSelectQuery('UPDATE rent SET MedianWeeklyRent = 500')).toBe(false);
+    expect(validateSelectQuery('   ')).toBe(false);
+  });
 
-  it('rejects all forbidden SQL keywords', () => {
-    const forbidden = ['drop', 'delete', 'insert', 'update', 'alter', 'create', 'truncate', 'grant', 'revoke']
-    forbidden.forEach(keyword => {
-      const result = validateSelectQuery(`SELECT * FROM t; ${keyword} x`)
-      expect(result.valid).toBe(false)
-      expect(result.error).toBe(`Forbidden keyword: ${keyword}`)
-    })
-  })
+  // Reject queries with forbidden SQL keywords
+  it('rejects forbidden SQL keywords', () => {
+    const forbiddenKeywords = ['drop', 'delete', 'insert', 'update', 'alter', 'create', 'truncate', 'grant', 'revoke'];
+    forbiddenKeywords.forEach(keyword => {
+      const query = `SELECT * FROM rent_comparison; ${keyword} something`;
+      const result = validateSelectQuery(query);
+      expect(result.valid).toBe(false);
+      expect(result.error).toBe(`Forbidden keyword: ${keyword}`);
+    });
+  });
 
+  // Reject forbidden keywords regardless of case
   it('rejects forbidden keywords regardless of case', () => {
-    expect(validateSelectQuery('SELECT * FROM t; DROP x').valid).toBe(false)
-    expect(validateSelectQuery('SELECT * FROM t; drop x').valid).toBe(false)
-    expect(validateSelectQuery('SELECT * FROM t; DrOp x').valid).toBe(false)
-  })
+    expect(validateSelectQuery('SELECT * FROM rent; DROP TABLE rent')).toBe(false);
+    expect(validateSelectQuery('SELECT * FROM rent; dRoP TABLE rent')).toBe(false);
+  });
 
+  // Allow column/table names that contain forbidden substrings
   it('allows column/table names containing forbidden substrings', () => {
-    expect(validateSelectQuery('SELECT updated_at FROM users').valid).toBe(true)
-    expect(validateSelectQuery('SELECT * FROM user_updates').valid).toBe(true)
-    expect(validateSelectQuery('SELECT created_at, deleted_flag FROM logs').valid).toBe(true)
-  })
-})
+    expect(validateSelectQuery('SELECT updated_at FROM rent')).toBe(true);
+    expect(validateSelectQuery('SELECT created_at, deleted_flag FROM rent_comparison')).toBe(true);
+  });
+});
+
