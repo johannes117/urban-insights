@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { createAgent } from '../lib/agent'
+import { createAgent, createModel } from '../lib/agent'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { UIElement } from '@json-render/core'
 import type { NestedUIElement, QueryResult, Report } from '../lib/types'
@@ -9,7 +9,7 @@ import { executeDatasetQuery } from '../lib/datasetTools'
 type StreamTextChunk = { type: 'text'; content: string }
 type StreamToolStartChunk = { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
 type StreamToolEndChunk = { type: 'tool_end'; toolCallId: string; result: {} }
-type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[]; report: Report | null }
+type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[]; report: Report | null; suggestions?: string[] }
 type StreamChunk = StreamTextChunk | StreamToolStartChunk | StreamToolEndChunk | StreamDoneChunk
 
 function extractUiFromMessages(messages: BaseMessage[]): UIElement | null {
@@ -159,6 +159,37 @@ function extractReportFromMessages(messages: BaseMessage[]): Report | null {
   return null
 }
 
+async function generateSuggestions(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+): Promise<string[]> {
+  const model = createModel()
+  const lastMessages = history.slice(-6)
+  const conversationText = lastMessages
+    .map((m) => `${m.role}: ${m.content}`)
+    .join('\n')
+
+  const response = await model.invoke([
+    new HumanMessage(
+      `Based on this conversation, suggest 2-3 short follow-up questions the user might ask next. Each must be under 60 characters. Return ONLY a JSON array of strings, no other text.\n\nConversation:\n${conversationText}`
+    ),
+  ])
+
+  const text = typeof response.content === 'string'
+    ? response.content
+    : Array.isArray(response.content)
+      ? (response.content.find(
+          (b): b is { type: 'text'; text: string } =>
+            typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
+        )?.text ?? '')
+      : ''
+
+  const match = text.match(/\[[\s\S]*\]/)
+  if (!match) return []
+  const parsed = JSON.parse(match[0])
+  if (!Array.isArray(parsed)) return []
+  return parsed.filter((s): s is string => typeof s === 'string').slice(0, 3)
+}
+
 interface SendMessageInput {
   message: string
   history?: Array<{ role: 'user' | 'assistant'; content: string }>
@@ -199,7 +230,7 @@ export const rehydrateQueryResults = createServerFn({ method: 'POST' })
           data: result.data,
           query: result.query ?? query,
         })
-      } else {
+      } else if ('error' in result) {
         errors.push({
           resultKey,
           error: result.error,
@@ -400,11 +431,24 @@ export const streamMessage = createServerFn({ method: 'POST' })
       const queryResults = extractQueryResults(finalMessages)
       const report = extractReportFromMessages(finalMessages)
 
+      let suggestions: string[] | undefined
+      try {
+        const history = [
+          ...(data.history ?? []),
+          { role: 'user' as const, content: data.message },
+          { role: 'assistant' as const, content: extractTextContent(finalMessages) },
+        ]
+        suggestions = await generateSuggestions(history)
+      } catch (e) {
+        console.warn('Failed to generate suggestions:', e)
+      }
+
       yield {
         type: 'done',
         ui: (ui as NestedUIElement | null) ?? null,
         queryResults,
         report,
+        suggestions,
       } satisfies StreamDoneChunk
     } catch (error) {
       console.error('Agent streaming error:', error)

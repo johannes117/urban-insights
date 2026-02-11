@@ -13,7 +13,7 @@ import {
 } from "@langchain/core/messages";
 import { datasetTools } from "./datasetTools";
 
-function createModel() {
+export function createModel() {
   if (process.env.GROQ_API_KEY) {
     return new ChatGroq({
       model: "moonshotai/kimi-k2-instruct-0905",

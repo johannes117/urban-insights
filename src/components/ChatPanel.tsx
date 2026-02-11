@@ -10,6 +10,8 @@ interface ChatPanelProps {
   messages: Message[]
   isLoading: boolean
   onSendMessage: (message: string) => void
+  suggestions?: string[]
+  onSuggestionClick?: (suggestion: string) => void
 }
 
 type GroupedEntry =
@@ -20,6 +22,8 @@ export function ChatPanel({
   messages,
   isLoading,
   onSendMessage,
+  suggestions = [],
+  onSuggestionClick,
 }: ChatPanelProps) {
   const scrollAnchorRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -112,6 +116,20 @@ export function ChatPanel({
       </div>
 
       <div className="mt-4 shrink-0">
+        {suggestions.length > 0 && !isLoading && (
+          <div className="mb-2 flex flex-wrap gap-2 animate-fade-in">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => onSuggestionClick?.(suggestion)}
+                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        )}
         <ChatInput
           onSendMessage={onSendMessage}
           isLoading={isLoading}

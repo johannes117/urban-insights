@@ -182,6 +182,7 @@ function App() {
   const [sessions, setSessions] = useState<ChatSessionSnapshot[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [isHydrated, setIsHydrated] = useState(false)
+  const [suggestions, setSuggestions] = useState<string[]>([])
   const [chatWidthPercent, setChatWidthPercent] = useState(33)
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -242,6 +243,7 @@ function App() {
   const activateSession = (session: ChatSessionSnapshot) => {
     setActiveSessionId(session.id)
     setMessages(session.messages)
+    setSuggestions(session.suggestions ?? [])
     setArtifactState(session.artifactState)
     void rehydrateSessionIfNeeded(session)
   }
@@ -273,13 +275,14 @@ function App() {
         id: activeSessionId,
         messages,
         artifactState,
+        suggestions,
         createdAt: existingSession?.createdAt,
         updatedAt: hasNewContent ? undefined : existingSession?.updatedAt,
       })
 
       return [nextSnapshot, ...prev.filter((session) => session.id !== activeSessionId)]
     })
-  }, [activeSessionId, artifactState, isHydrated, messages])
+  }, [activeSessionId, artifactState, isHydrated, messages, suggestions])
 
   const handleArtifactIndexChange = (nextIndex: number) => {
     setArtifactState((prev) => {
@@ -314,6 +317,7 @@ function App() {
     }
 
     setMessages((prev) => [...prev, userMessage])
+    setSuggestions([])
     setIsLoading(true)
 
     try {
@@ -404,6 +408,10 @@ function App() {
             )
           }
 
+          if (typedChunk.suggestions?.length) {
+            setSuggestions(typedChunk.suggestions)
+          }
+
           if (typedChunk.ui || typedChunk.report) {
             setArtifactState((prev) => {
               const queryResults = typedChunk.queryResults || []
@@ -465,6 +473,7 @@ function App() {
     rehydrateTaskRef.current += 1
     setActiveSessionId(null)
     setMessages([])
+    setSuggestions([])
     setArtifactState(EMPTY_ARTIFACT_STATE)
   }
 
@@ -541,6 +550,8 @@ function App() {
             messages={messages}
             isLoading={isLoading}
             onSendMessage={handleSendMessage}
+            suggestions={suggestions}
+            onSuggestionClick={handleSendMessage}
           />
         </div>
         {hasArtifact && (

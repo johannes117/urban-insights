@@ -23,12 +23,14 @@ export interface ChatSessionSnapshot {
   updatedAt: string
   messages: Message[]
   artifactState: ArtifactStateSnapshot
+  suggestions?: string[]
 }
 
 interface CreateChatSessionSnapshotInput {
   id: string
   messages: Message[]
   artifactState: ArtifactStateSnapshot
+  suggestions?: string[]
   createdAt?: string
   updatedAt?: string
 }
@@ -208,6 +210,10 @@ function normalizeSession(value: unknown): ChatSessionSnapshot | null {
   const artifactState = normalizeArtifactState(value.artifactState)
   const titleCandidate = typeof value.title === 'string' ? value.title.trim() : ''
 
+  const suggestions = Array.isArray(value.suggestions)
+    ? (value.suggestions as unknown[]).filter((s): s is string => typeof s === 'string')
+    : undefined
+
   return {
     id,
     title: titleCandidate || deriveSessionTitle(messages),
@@ -215,6 +221,7 @@ function normalizeSession(value: unknown): ChatSessionSnapshot | null {
     updatedAt,
     messages,
     artifactState,
+    suggestions,
   }
 }
 
@@ -226,6 +233,7 @@ export function createChatSessionSnapshot({
   id,
   messages,
   artifactState,
+  suggestions,
   createdAt,
   updatedAt,
 }: CreateChatSessionSnapshotInput): ChatSessionSnapshot {
@@ -239,6 +247,7 @@ export function createChatSessionSnapshot({
     updatedAt: resolvedUpdatedAt,
     messages,
     artifactState: normalizeArtifactState(artifactState),
+    suggestions,
   }
 }
 
