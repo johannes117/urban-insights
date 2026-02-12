@@ -155,6 +155,7 @@ function ReportTable({
   const { rows: tableData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
     requiredKeys: columns,
     requireAllKeys: false,
+    requireKeyCoverage: 'all',
   })
   if (!tableData.length) return null
 

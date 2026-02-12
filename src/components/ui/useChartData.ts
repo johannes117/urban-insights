@@ -9,6 +9,7 @@ export interface ChartDataResult<T = unknown[]> {
 export interface ResolveDataPathOptions {
   requiredKeys?: string[]
   requireAllKeys?: boolean
+  requireKeyCoverage?: 'all' | 'any'
 }
 
 export function resolveDataPath(
@@ -20,6 +21,7 @@ export function resolveDataPath(
   const { rows, error } = resolveRenderableRowsForDataPath(data, dataPath, {
     requiredKeys: options.requiredKeys,
     requireAllKeys: options.requireAllKeys,
+    requireKeyCoverage: options.requireKeyCoverage,
   })
 
   if (rows.length === 0 && error) {

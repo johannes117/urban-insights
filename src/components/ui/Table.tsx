@@ -21,6 +21,7 @@ export function Table({ element }: TableProps) {
     {
       requiredKeys: columns,
       requireAllKeys: false,
+      requireKeyCoverage: 'all',
     }
   )
 

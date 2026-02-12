@@ -2,15 +2,177 @@ import { createServerFn } from '@tanstack/react-start'
 import { createAgent, createModel } from '../lib/agent'
 import { HumanMessage, AIMessage } from '@langchain/core/messages'
 import type { UIElement } from '@json-render/core'
-import type { NestedUIElement, QueryResult, Report } from '../lib/types'
+import type { NestedUIElement, QueryResult, Report, StreamArtifactPayload } from '../lib/types'
 import type { BaseMessage } from '@langchain/core/messages'
 import { executeDatasetQuery } from '../lib/datasetTools'
+import {
+  collectArtifactRenderabilityIssues,
+  sanitizeArtifactContent,
+} from '../lib/renderability'
 
 type StreamTextChunk = { type: 'text'; content: string }
 type StreamToolStartChunk = { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
 type StreamToolEndChunk = { type: 'tool_end'; toolCallId: string; result: {} }
-type StreamDoneChunk = { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[]; report: Report | null; suggestions?: string[] }
+type StreamDoneChunk = {
+  type: 'done'
+  ui: NestedUIElement | null
+  queryResults: QueryResult[]
+  report: Report | null
+  artifacts?: StreamArtifactPayload[]
+  suggestions?: string[]
+}
 type StreamChunk = StreamTextChunk | StreamToolStartChunk | StreamToolEndChunk | StreamDoneChunk
+
+interface RenderedArtifact {
+  type: 'visualization' | 'report'
+  ui: NestedUIElement | null
+  report: Report | null
+}
+
+interface ArtifactRepairInput {
+  agent: ReturnType<typeof createAgent>
+  finalMessages: BaseMessage[]
+  ui: NestedUIElement | null
+  report: Report | null
+  queryResults: QueryResult[]
+}
+
+interface ArtifactRepairResult {
+  ui: NestedUIElement | null
+  report: Report | null
+  queryResults: QueryResult[]
+  repaired: boolean
+}
+
+function mergeQueryResultsByResultKey(
+  baseResults: QueryResult[],
+  nextResults: QueryResult[]
+): QueryResult[] {
+  const merged = new Map<string, QueryResult>()
+
+  for (const result of baseResults) {
+    merged.set(result.resultKey, result)
+  }
+
+  for (const result of nextResults) {
+    merged.set(result.resultKey, result)
+  }
+
+  return Array.from(merged.values())
+}
+
+function getQueryResultSummary(queryResults: QueryResult[]): string {
+  if (queryResults.length === 0) {
+    return '- No query results were returned'
+  }
+
+  return queryResults
+    .map((result) => {
+      const rows = Array.isArray(result.data) ? result.data : []
+      const sampleRow = rows.find((row): row is Record<string, unknown> => typeof row === 'object' && row !== null && !Array.isArray(row))
+      const keys = sampleRow ? Object.keys(sampleRow) : []
+      return `- ${result.resultKey}: ${rows.length} row(s), keys: [${keys.join(', ')}]`
+    })
+    .join('\n')
+}
+
+function buildArtifactRepairPrompt(
+  ui: NestedUIElement | null,
+  report: Report | null,
+  queryResults: QueryResult[]
+): string {
+  const issues = collectArtifactRenderabilityIssues({
+    ui,
+    report,
+    queryResults,
+  })
+
+  const issueSummary = issues
+    .map((issue, index) => {
+      const keys = issue.requiredKeys?.length ? ` requiredKeys=[${issue.requiredKeys.join(', ')}]` : ''
+      const available = issue.availableKeys?.length ? ` availableKeys=[${issue.availableKeys.join(', ')}]` : ''
+      const path = issue.dataPath ? ` dataPath=${issue.dataPath}` : ''
+      return `${index + 1}. ${issue.target}/${issue.componentType}:${path}${keys}${available}. Error: ${issue.message}`
+    })
+    .join('\n')
+
+  const hasReport = Boolean(report)
+  const hasUi = Boolean(ui)
+
+  return [
+    'The previous render output is not fully renderable in the app.',
+    'Regenerate ONLY a corrected render tool call using existing query results where possible.',
+    'Do not add narrative text.',
+    'Rules:',
+    '- dataPath must be "/<resultKey>" from query_dataset results.',
+    '- Table columns must map to actual keys in the selected result.',
+    '- Chart x/y/name/value keys must exist in result rows.',
+    '- Prefer changing column/key bindings over creating decorative text-only output.',
+    '',
+    `Current artifact type: ${hasReport ? 'report' : hasUi ? 'visualization' : 'unknown'}`,
+    'Query result summary:',
+    getQueryResultSummary(queryResults),
+    '',
+    'Renderability issues:',
+    issueSummary || '- Unknown renderability issue',
+  ].join('\n')
+}
+
+async function attemptArtifactRepair({
+  agent,
+  finalMessages,
+  ui,
+  report,
+  queryResults,
+}: ArtifactRepairInput): Promise<ArtifactRepairResult> {
+  const initialIssues = collectArtifactRenderabilityIssues({
+    ui,
+    report,
+    queryResults,
+  })
+
+  if (initialIssues.length === 0) {
+    return { ui, report, queryResults, repaired: false }
+  }
+
+  const prompt = buildArtifactRepairPrompt(ui, report, queryResults)
+
+  try {
+    const repairedState = await agent.invoke(
+      {
+        messages: [...finalMessages, new HumanMessage(prompt)],
+      },
+      { recursionLimit: 25 }
+    )
+
+    const repairedMessages = repairedState.messages as BaseMessage[]
+    const repairedUi = (extractUiFromMessages(repairedMessages) as NestedUIElement | null) ?? null
+    const repairedReport = extractReportFromMessages(repairedMessages)
+    const repairedQueryResults = mergeQueryResultsByResultKey(
+      queryResults,
+      extractQueryResults(repairedMessages)
+    )
+
+    const repairedIssues = collectArtifactRenderabilityIssues({
+      ui: repairedUi,
+      report: repairedReport,
+      queryResults: repairedQueryResults,
+    })
+
+    if (repairedIssues.length < initialIssues.length) {
+      return {
+        ui: repairedUi,
+        report: repairedReport,
+        queryResults: repairedQueryResults,
+        repaired: true,
+      }
+    }
+  } catch (error) {
+    console.warn('Artifact repair attempt failed:', error)
+  }
+
+  return { ui, report, queryResults, repaired: false }
+}
 
 function extractUiFromMessages(messages: BaseMessage[]): UIElement | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -44,6 +206,35 @@ function extractUiFromMessages(messages: BaseMessage[]): UIElement | null {
     }
   }
   return null
+}
+
+function extractRenderedArtifactsFromMessages(messages: BaseMessage[]): RenderedArtifact[] {
+  const artifacts: RenderedArtifact[] = []
+
+  for (const message of messages) {
+    const toolCalls = extractToolCallsFromMessage(message)
+    if (toolCalls.length === 0) continue
+
+    for (const toolCall of toolCalls) {
+      if (toolCall.name === 'render_ui' && toolCall.args?.ui) {
+        artifacts.push({
+          type: 'visualization',
+          ui: toolCall.args.ui as NestedUIElement,
+          report: null,
+        })
+      }
+
+      if (toolCall.name === 'render_report' && toolCall.args?.report) {
+        artifacts.push({
+          type: 'report',
+          ui: null,
+          report: toolCall.args.report as Report,
+        })
+      }
+    }
+  }
+
+  return artifacts
 }
 
 function extractTextContent(messages: BaseMessage[]): string {
@@ -203,6 +394,8 @@ export interface SendMessageResult {
   success: boolean
   response: string
   ui: NestedUIElement | null
+  report?: Report | null
+  artifacts?: StreamArtifactPayload[]
   queryResults: QueryResult[]
 }
 
@@ -260,15 +453,56 @@ export const sendMessage = createServerFn({ method: 'POST' })
     try {
       const result = await agent.invoke({ messages }, { recursionLimit: 100 })
       const finalMessages = result.messages as BaseMessage[]
-      const ui = extractUiFromMessages(finalMessages)
       const response = extractTextContent(finalMessages)
-      const queryResults = extractQueryResults(finalMessages)
+      const initialUi = (extractUiFromMessages(finalMessages) as NestedUIElement | null) ?? null
+      const initialQueryResults = extractQueryResults(finalMessages)
+      const initialReport = extractReportFromMessages(finalMessages)
+      const initialArtifacts = extractRenderedArtifactsFromMessages(finalMessages)
+
+      const repaired = await attemptArtifactRepair({
+        agent,
+        finalMessages,
+        ui: initialUi,
+        report: initialReport,
+        queryResults: initialQueryResults,
+      })
+
+      const sanitized = sanitizeArtifactContent({
+        ui: repaired.ui,
+        report: repaired.report,
+        queryResults: repaired.queryResults,
+      })
+
+      const artifacts: StreamArtifactPayload[] =
+        initialArtifacts.length > 0
+          ? initialArtifacts.map((artifact, index) => {
+              const isLastArtifact = index === initialArtifacts.length - 1
+              if (!isLastArtifact || !repaired.repaired) {
+                return {
+                  ui: artifact.ui,
+                  report: artifact.report,
+                }
+              }
+
+              return {
+                ui: repaired.ui,
+                report: repaired.report,
+              }
+            })
+          : [
+              {
+                ui: sanitized.ui,
+                report: sanitized.report,
+              }
+            ]
 
       return {
         success: true,
         response: response || "I've processed your request.",
-        ui: (ui as NestedUIElement | null) ?? null,
-        queryResults,
+        ui: sanitized.ui,
+        report: sanitized.report,
+        artifacts,
+        queryResults: repaired.queryResults,
       }
     } catch (error) {
       console.error('Agent error:', error)
@@ -276,6 +510,8 @@ export const sendMessage = createServerFn({ method: 'POST' })
         success: false,
         response: 'Sorry, I encountered an error processing your request.',
         ui: null,
+        report: null,
+        artifacts: [],
         queryResults: [],
       }
     }
@@ -427,9 +663,47 @@ export const streamMessage = createServerFn({ method: 'POST' })
         }
       }
 
-      const ui = extractUiFromMessages(finalMessages)
-      const queryResults = extractQueryResults(finalMessages)
-      const report = extractReportFromMessages(finalMessages)
+      const initialUi = (extractUiFromMessages(finalMessages) as NestedUIElement | null) ?? null
+      const initialQueryResults = extractQueryResults(finalMessages)
+      const initialReport = extractReportFromMessages(finalMessages)
+      const initialArtifacts = extractRenderedArtifactsFromMessages(finalMessages)
+
+      const repaired = await attemptArtifactRepair({
+        agent,
+        finalMessages,
+        ui: initialUi,
+        report: initialReport,
+        queryResults: initialQueryResults,
+      })
+
+      const sanitized = sanitizeArtifactContent({
+        ui: repaired.ui,
+        report: repaired.report,
+        queryResults: repaired.queryResults,
+      })
+
+      const artifacts: StreamArtifactPayload[] =
+        initialArtifacts.length > 0
+          ? initialArtifacts.map((artifact, index) => {
+              const isLastArtifact = index === initialArtifacts.length - 1
+              if (!isLastArtifact || !repaired.repaired) {
+                return {
+                  ui: artifact.ui,
+                  report: artifact.report,
+                }
+              }
+
+              return {
+                ui: repaired.ui,
+                report: repaired.report,
+              }
+            })
+          : [
+              {
+                ui: sanitized.ui,
+                report: sanitized.report,
+              },
+            ]
 
       let suggestions: string[] | undefined
       try {
@@ -445,13 +719,20 @@ export const streamMessage = createServerFn({ method: 'POST' })
 
       yield {
         type: 'done',
-        ui: (ui as NestedUIElement | null) ?? null,
-        queryResults,
-        report,
+        ui: sanitized.ui,
+        queryResults: repaired.queryResults,
+        report: sanitized.report,
+        artifacts,
         suggestions,
       } satisfies StreamDoneChunk
     } catch (error) {
       console.error('Agent streaming error:', error)
-      yield { type: 'done', ui: null, queryResults: [], report: null } satisfies StreamDoneChunk
+      yield {
+        type: 'done',
+        ui: null,
+        queryResults: [],
+        report: null,
+        artifacts: [],
+      } satisfies StreamDoneChunk
     }
   })

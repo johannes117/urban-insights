@@ -386,22 +386,40 @@ function App() {
           }
         } else if (typedChunk.type === 'done') {
           const queryResults = typedChunk.queryResults || []
-          const {
-            ui: sanitizedUi,
-            report: sanitizedReport,
-            hasRenderableContent,
-          } = sanitizeArtifactContent({
-            ui: typedChunk.ui ?? null,
-            report: typedChunk.report ?? null,
-            queryResults,
-          })
+          const rawArtifacts =
+            typedChunk.artifacts && typedChunk.artifacts.length > 0
+              ? typedChunk.artifacts.map((artifact) => ({
+                  ui: artifact.ui ?? null,
+                  report: artifact.report ?? null,
+                }))
+              : typedChunk.ui || typedChunk.report
+                ? [{ ui: typedChunk.ui ?? null, report: typedChunk.report ?? null }]
+                : []
+
+          const sanitizedArtifacts = rawArtifacts
+            .map((artifact) =>
+              sanitizeArtifactContent({
+                ui: artifact.ui,
+                report: artifact.report,
+                queryResults,
+              })
+            )
+            .filter((artifact) => artifact.hasRenderableContent && (artifact.ui || artifact.report))
+
+          const primaryArtifact =
+            sanitizedArtifacts.length > 0
+              ? sanitizedArtifacts[sanitizedArtifacts.length - 1]
+              : null
+          const hasRenderableContent = sanitizedArtifacts.length > 0
 
           if (!currentTextMessageId && currentText === '') {
             const content = hasRenderableContent
-              ? sanitizedReport
-                ? "I've created the report for you."
-                : "I've created the visualization for you."
-              : typedChunk.ui || typedChunk.report
+              ? sanitizedArtifacts.length > 1
+                ? `I've created ${sanitizedArtifacts.length} visualizations for you.`
+                : primaryArtifact?.report
+                  ? "I've created the report for you."
+                  : "I've created the visualization for you."
+              : rawArtifacts.length > 0
                 ? "I couldn't render a visualization from that data. Try broadening the query or adjusting filters."
                 : "I've processed your request."
 
@@ -409,13 +427,13 @@ function App() {
               id: crypto.randomUUID(),
               role: 'assistant',
               content,
-              ui: sanitizedUi ?? undefined,
+              ui: primaryArtifact?.ui ?? undefined,
             }
             setMessages((prev) => [...prev, doneMessage])
-          } else if (currentTextMessageId && sanitizedUi) {
+          } else if (currentTextMessageId && primaryArtifact?.ui) {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === currentTextMessageId ? { ...m, ui: sanitizedUi ?? undefined } : m
+                m.id === currentTextMessageId ? { ...m, ui: primaryArtifact.ui ?? undefined } : m
               )
             )
           }
@@ -424,20 +442,21 @@ function App() {
             setSuggestions(typedChunk.suggestions)
           }
 
-          if (hasRenderableContent && (sanitizedUi || sanitizedReport)) {
+          if (hasRenderableContent) {
             setArtifactState((prev) => {
-              const newArtifact: Artifact = {
-                type: sanitizedReport ? 'report' : 'visualization',
-                ui: sanitizedUi ?? undefined,
-                report: sanitizedReport ?? undefined,
+              const nextArtifacts: Artifact[] = sanitizedArtifacts.map((artifact) => ({
+                type: artifact.report ? 'report' : 'visualization',
+                ui: artifact.ui ?? undefined,
+                report: artifact.report ?? undefined,
                 queryResults,
                 dataSnapshot: buildArtifactDataSnapshot({
-                  ui: sanitizedUi ?? undefined,
-                  report: sanitizedReport ?? undefined,
+                  ui: artifact.ui ?? undefined,
+                  report: artifact.report ?? undefined,
                   queryResults,
                 }),
-              }
-              const items = [...prev.items, newArtifact]
+              }))
+
+              const items = [...prev.items, ...nextArtifacts]
               return { items, index: items.length - 1 }
             })
           }

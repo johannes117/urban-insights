@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  collectArtifactRenderabilityIssues,
   pruneNonRenderableReport,
   pruneNonRenderableUi,
   resolveRenderableRowsForDataPath,
@@ -21,6 +22,28 @@ describe('renderability', () => {
 
     expect(result.error).toBeNull()
     expect(result.rows).toEqual([{ Year: 2024, Count: 11, year: 2024, count: 11 }])
+  })
+
+  it('normalizes required keys using punctuation-insensitive matching', () => {
+    const data = {
+      housing: [{ apr_jun_2025: 960000, change_yoy: 0.7 }],
+    }
+
+    const result = resolveRenderableRowsForDataPath(data, '/housing', {
+      requiredKeys: ['APR-JUN 2025', '% CHANGE YOY'],
+      requireAllKeys: true,
+      requireKeyCoverage: 'all',
+    })
+
+    expect(result.error).toBeNull()
+    expect(result.rows).toEqual([
+      {
+        apr_jun_2025: 960000,
+        change_yoy: 0.7,
+        'APR-JUN 2025': 960000,
+        '% CHANGE YOY': 0.7,
+      },
+    ])
   })
 
   it('prunes a non-renderable UI tree that only contains empty chart elements', () => {
@@ -116,5 +139,43 @@ describe('renderability', () => {
 
     expect(result.ui).toBeNull()
     expect(result.hasRenderableContent).toBe(false)
+  })
+
+  it('rejects tables when not all requested columns can be resolved', () => {
+    const result = resolveRenderableRowsForDataPath(
+      {
+        suburbs: [{ suburb: 'Ocean Grove' }],
+      },
+      '/suburbs',
+      {
+        requiredKeys: ['suburb', 'APR-JUN 2025', '% CHANGE YOY'],
+        requireAllKeys: false,
+        requireKeyCoverage: 'all',
+      }
+    )
+
+    expect(result.rows).toEqual([])
+    expect(result.error).toContain('Missing required fields')
+  })
+
+  it('reports renderability issues with available keys for LLM repair', () => {
+    const issues = collectArtifactRenderabilityIssues({
+      ui: {
+        type: 'Table',
+        props: {
+          columns: ['Suburb', 'Apr-Jun 2025', '% Change YoY'],
+          dataPath: '/geelong_house_values',
+        },
+      },
+      queryResults: [
+        {
+          resultKey: 'geelong_house_values',
+          data: [{ suburb: 'Ocean Grove', apr_jun_2025: 960000 }],
+        },
+      ],
+    })
+
+    expect(issues).toHaveLength(1)
+    expect(issues[0]?.availableKeys).toEqual(['suburb', 'apr_jun_2025'])
   })
 })

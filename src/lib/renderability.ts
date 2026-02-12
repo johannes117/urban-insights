@@ -1,4 +1,5 @@
 import type { NestedUIElement, QueryResult, Report, ReportSection } from './types'
+import { normalizeLookupKey } from './datasetNormalization'
 
 type DataRecord = Record<string, unknown>
 type DataRow = Record<string, unknown>
@@ -6,11 +7,21 @@ type DataRow = Record<string, unknown>
 export interface DataRequirement {
   requiredKeys?: string[]
   requireAllKeys?: boolean
+  requireKeyCoverage?: 'all' | 'any'
 }
 
 export interface ResolvedRows {
   rows: DataRow[]
   error: string | null
+}
+
+export interface RenderabilityIssue {
+  target: 'ui' | 'report'
+  componentType: string
+  message: string
+  dataPath?: string
+  requiredKeys?: string[]
+  availableKeys?: string[]
 }
 
 interface UiDataRequirement extends DataRequirement {
@@ -46,7 +57,15 @@ function findValueCaseInsensitive(row: DataRow, key: string): unknown {
 
   const normalized = key.toLowerCase()
   const actual = Object.keys(row).find((candidate) => candidate.toLowerCase() === normalized)
-  return actual ? row[actual] : undefined
+  if (actual) return row[actual]
+
+  const normalizedLookup = normalizeLookupKey(key)
+  if (!normalizedLookup) return undefined
+
+  const fuzzyMatch = Object.keys(row).find(
+    (candidate) => normalizeLookupKey(candidate) === normalizedLookup
+  )
+  return fuzzyMatch ? row[fuzzyMatch] : undefined
 }
 
 function normalizeRowWithRequiredKeys(row: DataRow, requiredKeys: string[]): DataRow {
@@ -101,7 +120,12 @@ function getUiDataRequirement(element: NestedUIElement): UiDataRequirement | nul
   if (element.type === 'Table') {
     const columns = getStringArrayProp(props, 'columns')
     if (columns.length === 0) return null
-    return { dataPath, requiredKeys: columns, requireAllKeys: false }
+    return {
+      dataPath,
+      requiredKeys: columns,
+      requireAllKeys: false,
+      requireKeyCoverage: 'all',
+    }
   }
 
   if (element.type === 'List') {
@@ -148,6 +172,7 @@ function getReportSectionDataRequirement(section: ReportSection): UiDataRequirem
       dataPath: section.dataPath,
       requiredKeys: columns,
       requireAllKeys: false,
+      requireKeyCoverage: 'all',
     }
   }
 
@@ -177,6 +202,35 @@ export function buildQueryResultData(queryResults: QueryResult[]): DataRecord {
     data[result.resultKey] = result.data
   }
   return data
+}
+
+function getAvailableKeysAtDataPath(
+  data: DataRecord,
+  dataPath: string | undefined
+): string[] {
+  if (!dataPath) return []
+
+  const pathParts = dataPath.replace(/^\//, '').split('/').filter((part) => part.length > 0)
+  if (pathParts.length === 0) return []
+
+  let current: unknown = data
+  for (const part of pathParts) {
+    if (!isRecord(current) || !(part in current)) {
+      return []
+    }
+    current = current[part]
+  }
+
+  if (Array.isArray(current)) {
+    const sampleRow = current.find((value): value is DataRow => isRecord(value))
+    return sampleRow ? Object.keys(sampleRow) : []
+  }
+
+  if (isRecord(current)) {
+    return Object.keys(current)
+  }
+
+  return []
 }
 
 export function resolveRenderableRowsForDataPath(
@@ -217,7 +271,22 @@ export function resolveRenderableRowsForDataPath(
   const requiredKeys =
     requirement.requiredKeys?.map((key) => key.trim()).filter((key) => key.length > 0) ?? []
   const requireAllKeys = requirement.requireAllKeys ?? true
+  const requireKeyCoverage = requirement.requireKeyCoverage ?? 'any'
   const normalizedRows = rawRows.map((row) => normalizeRowWithRequiredKeys(row, requiredKeys))
+
+  if (requiredKeys.length > 0 && requireKeyCoverage === 'all') {
+    const hasCoverageForAllKeys = requiredKeys.every((key) =>
+      normalizedRows.some((row) => key in row)
+    )
+
+    if (!hasCoverageForAllKeys) {
+      return {
+        rows: [],
+        error: `Missing required fields (${requiredKeys.join(', ')})`,
+      }
+    }
+  }
+
   const matchedRows = normalizedRows.filter((row) =>
     rowMatchesRequirement(row, requiredKeys, requireAllKeys)
   )
@@ -320,6 +389,80 @@ export function hasRenderableReport(report: Report | null | undefined, data: Dat
   return [report.introduction, report.callToAction, report.closing].some(
     (value) => typeof value === 'string' && value.trim().length > 0
   )
+}
+
+function collectUiIssues(
+  element: NestedUIElement | null | undefined,
+  data: DataRecord,
+  issues: RenderabilityIssue[]
+): void {
+  if (!element) return
+
+  const requirement = getUiDataRequirement(element)
+  if (requirement) {
+    const result = resolveRenderableRowsForDataPath(data, requirement.dataPath, requirement)
+    if (result.rows.length === 0) {
+      issues.push({
+        target: 'ui',
+        componentType: element.type,
+        message: result.error ?? 'No rows available for render',
+        dataPath: requirement.dataPath,
+        requiredKeys: requirement.requiredKeys,
+        availableKeys: getAvailableKeysAtDataPath(data, requirement.dataPath),
+      })
+    }
+  }
+
+  if (Array.isArray(element.children)) {
+    for (const child of element.children) {
+      collectUiIssues(child, data, issues)
+    }
+  }
+}
+
+function collectReportIssues(
+  report: Report | null | undefined,
+  data: DataRecord,
+  issues: RenderabilityIssue[]
+): void {
+  if (!report) return
+
+  for (const section of report.sections) {
+    const requirement = getReportSectionDataRequirement(section)
+    if (!requirement) continue
+
+    const result = resolveRenderableRowsForDataPath(data, requirement.dataPath, requirement)
+    if (result.rows.length === 0) {
+      issues.push({
+        target: 'report',
+        componentType: section.type === 'chart' ? `chart:${section.chartType ?? 'unknown'}` : section.type,
+        message: result.error ?? 'No rows available for render',
+        dataPath: requirement.dataPath,
+        requiredKeys: requirement.requiredKeys,
+        availableKeys: getAvailableKeysAtDataPath(data, requirement.dataPath),
+      })
+    }
+  }
+}
+
+interface ArtifactIssueInput {
+  ui?: NestedUIElement | null
+  report?: Report | null
+  queryResults?: QueryResult[]
+}
+
+export function collectArtifactRenderabilityIssues({
+  ui = null,
+  report = null,
+  queryResults = [],
+}: ArtifactIssueInput): RenderabilityIssue[] {
+  const data = buildQueryResultData(queryResults)
+  const issues: RenderabilityIssue[] = []
+
+  collectUiIssues(ui, data, issues)
+  collectReportIssues(report, data, issues)
+
+  return issues
 }
 
 interface SanitizeArtifactContentInput {

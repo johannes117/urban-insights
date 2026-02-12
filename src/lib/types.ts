@@ -36,6 +36,11 @@ export interface QueryResult {
   partial?: boolean
 }
 
+export interface StreamArtifactPayload {
+  ui?: NestedUIElement | null
+  report?: Report | null
+}
+
 export type ArtifactDataSnapshot = Record<string, Record<string, unknown>[]>
 
 export interface ComponentProps<T = Record<string, unknown>> {
@@ -50,7 +55,14 @@ export type StreamChunk =
   | { type: 'tool_start'; toolCallId: string; name: string; args: Record<string, {}> }
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   | { type: 'tool_end'; toolCallId: string; result: {} }
-  | { type: 'done'; ui: NestedUIElement | null; queryResults: QueryResult[]; report: Report | null; suggestions?: string[] }
+  | {
+      type: 'done'
+      ui: NestedUIElement | null
+      queryResults: QueryResult[]
+      report: Report | null
+      artifacts?: StreamArtifactPayload[]
+      suggestions?: string[]
+    }
 
 export interface ReportSection {
   type: 'text' | 'chart' | 'table' | 'metric'
