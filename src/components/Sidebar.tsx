@@ -88,9 +88,10 @@ export function Sidebar({
       onMouseLeave={supportsHover ? () => setIsExpanded(false) : undefined}
     >
       <div className="flex flex-col gap-1 p-2">
-        <Link
-          to="/"
-          className="flex h-10 items-center gap-3 rounded-lg px-2 transition-colors hover:bg-gray-100"
+        <button
+          type="button"
+          onClick={handleNewChat}
+          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
         >
           <img
             src="/images/urban-insights-logo.png"
@@ -104,7 +105,7 @@ export function Sidebar({
           >
             Urban Insights
           </span>
-        </Link>
+        </button>
 
         <button
           type="button"
