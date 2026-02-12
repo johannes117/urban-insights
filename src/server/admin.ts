@@ -3,6 +3,12 @@ import { db, datasets, type ColumnInfo, type Dataset } from '../db'
 import { eq, sql as drizzleSql } from 'drizzle-orm'
 import { neon } from '@neondatabase/serverless'
 import * as Papa from 'papaparse'
+import {
+  normalizeColumns,
+  normalizeDatasetName,
+  normalizeLookupKey,
+  sanitizeTableName,
+} from '../lib/datasetNormalization'
 
 function getSql() {
   return neon(process.env.DATABASE_URL!)
@@ -14,10 +20,6 @@ function requireAuth(password: string) {
   if (password !== ADMIN_PASSWORD) {
     throw new Error('Unauthorized')
   }
-}
-
-function sanitizeTableName(name: string): string {
-  return 'dataset_' + name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 50)
 }
 
 function stripNumericFormatting(value: string): string {
@@ -74,6 +76,50 @@ function convertValue(value: string, type: ColumnInfo['type']): unknown {
   }
 }
 
+function resolveRowValue(
+  row: Record<string, string>,
+  normalizedColumnName: string,
+  sourceColumnName?: string
+): string {
+  if (sourceColumnName && sourceColumnName in row) {
+    return row[sourceColumnName] ?? ''
+  }
+
+  if (normalizedColumnName in row) {
+    return row[normalizedColumnName] ?? ''
+  }
+
+  const targetKey = normalizeLookupKey(normalizedColumnName)
+  const matchedKey = Object.keys(row).find((key) => normalizeLookupKey(key) === targetKey)
+  if (!matchedKey) return ''
+
+  return row[matchedKey] ?? ''
+}
+
+function remapRowsToNormalizedColumns(
+  rows: Record<string, string>[],
+  sourceColumns: ColumnInfo[],
+  normalizedColumns: ColumnInfo[]
+): Record<string, string>[] {
+  return rows.map((row) => {
+    const nextRow: Record<string, string> = {}
+
+    for (let index = 0; index < normalizedColumns.length; index += 1) {
+      const sourceColumn = sourceColumns[index]
+      const normalizedColumn = normalizedColumns[index]
+      if (!sourceColumn || !normalizedColumn) continue
+
+      nextRow[normalizedColumn.name] = resolveRowValue(
+        row,
+        normalizedColumn.name,
+        sourceColumn.name
+      )
+    }
+
+    return nextRow
+  })
+}
+
 export const verifyAdminPassword = createServerFn({ method: 'POST' })
   .inputValidator((d: { password: string }) => d)
   .handler(async ({ data }) => {
@@ -127,7 +173,7 @@ export const previewCsv = createServerFn({ method: 'POST' })
     const headers = parsed.meta.fields || []
     const rows = parsed.data.slice(0, 10)
 
-    const columns: ColumnInfo[] = headers.map((header) => {
+    const sourceColumns: ColumnInfo[] = headers.map((header) => {
       const values = parsed.data.map((row) => row[header])
       const inferredType = inferColumnType(values)
       return {
@@ -137,11 +183,15 @@ export const previewCsv = createServerFn({ method: 'POST' })
       }
     })
 
+    const columns = normalizeColumns(sourceColumns)
+    const sampleRows = remapRowsToNormalizedColumns(rows, sourceColumns, columns)
+    const suggestedName = normalizeDatasetName(data.name.replace(/\.csv$/i, ''))
+
     return {
       columns,
-      sampleRows: rows,
+      sampleRows,
       totalRows: parsed.data.length,
-      suggestedName: data.name.replace(/\.csv$/i, ''),
+      suggestedName,
     }
   })
 
@@ -177,10 +227,15 @@ export const uploadDataset = createServerFn({ method: 'POST' })
       throw new Error('CSV file is empty or contains no valid data rows')
     }
 
-    const tableName = sanitizeTableName(data.name)
+    const normalizedName = normalizeDatasetName(data.name)
+    const sourceColumns = data.columns
+    const normalizedColumns = normalizeColumns(sourceColumns)
+    const normalizedRows = remapRowsToNormalizedColumns(parsed.data, sourceColumns, normalizedColumns)
+
+    const tableName = sanitizeTableName(normalizedName)
     const sql = getSql()
 
-    const columnDefs = data.columns
+    const columnDefs = normalizedColumns
       .map((col) => `"${col.name.replace(/"/g, '""')}" ${getPgType(col.type)}`)
       .join(', ')
 
@@ -197,11 +252,11 @@ export const uploadDataset = createServerFn({ method: 'POST' })
     }
 
     const batchSize = 200
-    const colNames = data.columns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(', ')
+    const colNames = normalizedColumns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(', ')
 
     try {
-      for (let i = 0; i < parsed.data.length; i += batchSize) {
-        const batch = parsed.data.slice(i, i + batchSize)
+      for (let i = 0; i < normalizedRows.length; i += batchSize) {
+        const batch = normalizedRows.slice(i, i + batchSize)
         const allValues: unknown[] = []
         const valuePlaceholders: string[] = []
 
@@ -210,8 +265,8 @@ export const uploadDataset = createServerFn({ method: 'POST' })
           const rowNumber = i + j + 2
           const rowPlaceholders: string[] = []
 
-          for (let k = 0; k < data.columns.length; k++) {
-            const col = data.columns[k]
+          for (let k = 0; k < normalizedColumns.length; k++) {
+            const col = normalizedColumns[k]
             const paramIndex = allValues.length + 1
             rowPlaceholders.push(`$${paramIndex}`)
             try {
@@ -235,11 +290,11 @@ export const uploadDataset = createServerFn({ method: 'POST' })
       const [dataset] = await db
         .insert(datasets)
         .values({
-          name: data.name,
+          name: normalizedName,
           description: data.description,
           tableName,
-          columns: data.columns,
-          rowCount: String(parsed.data.length),
+          columns: normalizedColumns,
+          rowCount: String(normalizedRows.length),
         })
         .returning()
 
@@ -261,9 +316,11 @@ export const createDatasetTable = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     requireAuth(data.password)
 
-    const tableName = sanitizeTableName(data.name)
+    const normalizedName = normalizeDatasetName(data.name)
+    const normalizedColumns = normalizeColumns(data.columns)
+    const tableName = sanitizeTableName(normalizedName)
 
-    const columnDefs = data.columns
+    const columnDefs = normalizedColumns
       .map((col) => `"${col.name.replace(/"/g, '""')}" ${getPgType(col.type)}`)
       .join(', ')
 
@@ -279,7 +336,11 @@ export const createDatasetTable = createServerFn({ method: 'POST' })
       throw new Error(`Failed to create table: ${e instanceof Error ? e.message : 'Unknown error'}. Check column names for invalid characters.`)
     }
 
-    return { tableName }
+    return {
+      tableName,
+      datasetName: normalizedName,
+      columns: normalizedColumns,
+    }
   })
 
 export const insertDatasetBatch = createServerFn({ method: 'POST' })
@@ -296,18 +357,22 @@ export const insertDatasetBatch = createServerFn({ method: 'POST' })
 
     if (data.rows.length === 0) return { inserted: 0 }
 
+    const sourceColumns = data.columns
+    const normalizedColumns = normalizeColumns(sourceColumns)
+    const normalizedRows = remapRowsToNormalizedColumns(data.rows, sourceColumns, normalizedColumns)
+
     const sql = getSql()
-    const colNames = data.columns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(', ')
+    const colNames = normalizedColumns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(', ')
 
     const allValues: unknown[] = []
     const valuePlaceholders: string[] = []
 
-    for (let j = 0; j < data.rows.length; j++) {
-      const row = data.rows[j]
+    for (let j = 0; j < normalizedRows.length; j++) {
+      const row = normalizedRows[j]
       const rowPlaceholders: string[] = []
 
-      for (let k = 0; k < data.columns.length; k++) {
-        const col = data.columns[k]
+      for (let k = 0; k < normalizedColumns.length; k++) {
+        const col = normalizedColumns[k]
         const paramIndex = allValues.length + 1
         rowPlaceholders.push(`$${paramIndex}`)
         allValues.push(convertValue(row[col.name], col.type))
@@ -318,7 +383,7 @@ export const insertDatasetBatch = createServerFn({ method: 'POST' })
     const insertQuery = `INSERT INTO "${data.tableName}" (${colNames}) VALUES ${valuePlaceholders.join(', ')}`
     await sql.query(insertQuery, allValues)
 
-    return { inserted: data.rows.length }
+    return { inserted: normalizedRows.length }
   })
 
 export const finalizeDataset = createServerFn({ method: 'POST' })
@@ -335,13 +400,16 @@ export const finalizeDataset = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     requireAuth(data.password)
 
+    const normalizedName = normalizeDatasetName(data.name)
+    const normalizedColumns = normalizeColumns(data.columns)
+
     const [dataset] = await db
       .insert(datasets)
       .values({
-        name: data.name,
+        name: normalizedName,
         description: data.description,
         tableName: data.tableName,
-        columns: data.columns,
+        columns: normalizedColumns,
         rowCount: String(data.rowCount),
       })
       .returning()

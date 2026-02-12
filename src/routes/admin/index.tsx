@@ -15,6 +15,10 @@ import {
 import type { ColumnInfo } from '../../db/schema'
 import { Upload, Trash2, Eye, Database, X, Check } from 'lucide-react'
 import * as Papa from 'papaparse'
+import {
+  normalizeColumns,
+  normalizeDatasetName,
+} from '../../lib/datasetNormalization'
 
 function inferColumnType(values: string[]): ColumnInfo['type'] {
   const nonEmpty = values.filter((v) => v !== '' && v !== null && v !== undefined)
@@ -36,6 +40,25 @@ function inferColumnType(values: string[]): ColumnInfo['type'] {
   if (allDates) return 'date'
 
   return 'text'
+}
+
+function remapRowsToNormalizedColumns(
+  rows: Record<string, string>[],
+  sourceColumns: ColumnInfo[],
+  normalizedColumns: ColumnInfo[]
+): Record<string, string>[] {
+  return rows.map((row) => {
+    const normalizedRow: Record<string, string> = {}
+
+    for (let index = 0; index < normalizedColumns.length; index += 1) {
+      const sourceColumn = sourceColumns[index]
+      const normalizedColumn = normalizedColumns[index]
+      if (!sourceColumn || !normalizedColumn) continue
+      normalizedRow[normalizedColumn.name] = row[sourceColumn.name] ?? ''
+    }
+
+    return normalizedRow
+  })
 }
 
 function ProgressStage({
@@ -200,7 +223,7 @@ function AdminPage() {
         return
       }
 
-      const cols: ColumnInfo[] = headers.map((header) => {
+      const sourceColumns: ColumnInfo[] = headers.map((header) => {
         const values = parsed.data.map((row) => row[header])
         const inferredType = inferColumnType(values)
         return {
@@ -210,15 +233,23 @@ function AdminPage() {
         }
       })
 
-      setParsedRows(parsed.data)
+      const normalizedColumns = normalizeColumns(sourceColumns)
+      const normalizedRows = remapRowsToNormalizedColumns(
+        parsed.data,
+        sourceColumns,
+        normalizedColumns
+      )
+      const normalizedDatasetName = normalizeDatasetName(file.name.replace(/\.csv$/i, ''))
+
+      setParsedRows(normalizedRows)
       setPreviewData({
-        columns: cols,
-        sampleRows: parsed.data.slice(0, 10),
-        totalRows: parsed.data.length,
-        suggestedName: file.name.replace(/\.csv$/i, ''),
+        columns: normalizedColumns,
+        sampleRows: normalizedRows.slice(0, 10),
+        totalRows: normalizedRows.length,
+        suggestedName: normalizedDatasetName,
       })
-      setDatasetName(file.name.replace(/\.csv$/i, ''))
-      setColumns(cols)
+      setDatasetName(normalizedDatasetName)
+      setColumns(normalizedColumns)
       setUploadStep('preview')
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to parse CSV'
@@ -236,6 +267,8 @@ function AdminPage() {
     const totalRows = parsedRows.length
 
     let tableName = ''
+    let normalizedDatasetName = normalizeDatasetName(datasetName)
+    let normalizedColumns = normalizeColumns(columns)
 
     try {
       setUploadProgress({ stage: 'creating', totalRows, insertedRows: 0 })
@@ -244,6 +277,10 @@ function AdminPage() {
         data: { password, name: datasetName, columns },
       })
       tableName = tableResult.tableName
+      normalizedDatasetName = tableResult.datasetName
+      normalizedColumns = tableResult.columns
+      setDatasetName(normalizedDatasetName)
+      setColumns(normalizedColumns)
 
       setUploadProgress({ stage: 'inserting', totalRows, insertedRows: 0 })
 
@@ -253,7 +290,7 @@ function AdminPage() {
       for (let i = 0; i < parsedRows.length; i += batchSize) {
         const batch = parsedRows.slice(i, i + batchSize)
         await insertDatasetBatch({
-          data: { password, tableName, columns, rows: batch },
+          data: { password, tableName, columns: normalizedColumns, rows: batch },
         })
         insertedRows += batch.length
         setUploadProgress({ stage: 'inserting', totalRows, insertedRows })
@@ -264,10 +301,10 @@ function AdminPage() {
       await finalizeDataset({
         data: {
           password,
-          name: datasetName,
+          name: normalizedDatasetName,
           description: datasetDescription,
           tableName,
-          columns,
+          columns: normalizedColumns,
           rowCount: totalRows,
         },
       })
