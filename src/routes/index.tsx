@@ -16,6 +16,7 @@ import {
   mergeQueryResultsWithSnapshot,
   snapshotHasRows,
 } from '../lib/artifactSnapshots'
+import { sanitizeArtifactContent, toResultKey } from '../lib/renderability'
 import { rehydrateQueryResults, streamMessage } from '../server/chat'
 import type {
   Artifact,
@@ -33,14 +34,6 @@ export const Route = createFileRoute('/')({
 })
 
 const EMPTY_ARTIFACT_STATE: ArtifactStateSnapshot = { items: [], index: -1 }
-
-function toResultKey(dataPath: string | undefined): string | null {
-  if (!dataPath) return null
-
-  const key = dataPath.replace(/^\//, '').split('/')[0]?.trim()
-  if (!key) return null
-  return key
-}
 
 function collectResultKeysFromUi(element: NestedUIElement | undefined, target: Set<string>): void {
   if (!element) return
@@ -392,18 +385,37 @@ function App() {
             )
           }
         } else if (typedChunk.type === 'done') {
+          const queryResults = typedChunk.queryResults || []
+          const {
+            ui: sanitizedUi,
+            report: sanitizedReport,
+            hasRenderableContent,
+          } = sanitizeArtifactContent({
+            ui: typedChunk.ui ?? null,
+            report: typedChunk.report ?? null,
+            queryResults,
+          })
+
           if (!currentTextMessageId && currentText === '') {
+            const content = hasRenderableContent
+              ? sanitizedReport
+                ? "I've created the report for you."
+                : "I've created the visualization for you."
+              : typedChunk.ui || typedChunk.report
+                ? "I couldn't render a visualization from that data. Try broadening the query or adjusting filters."
+                : "I've processed your request."
+
             const doneMessage: Message = {
               id: crypto.randomUUID(),
               role: 'assistant',
-              content: "I've created the visualization for you.",
-              ui: typedChunk.ui ?? undefined,
+              content,
+              ui: sanitizedUi ?? undefined,
             }
             setMessages((prev) => [...prev, doneMessage])
-          } else if (currentTextMessageId && typedChunk.ui) {
+          } else if (currentTextMessageId && sanitizedUi) {
             setMessages((prev) =>
               prev.map((m) =>
-                m.id === currentTextMessageId ? { ...m, ui: typedChunk.ui ?? undefined } : m
+                m.id === currentTextMessageId ? { ...m, ui: sanitizedUi ?? undefined } : m
               )
             )
           }
@@ -412,17 +424,16 @@ function App() {
             setSuggestions(typedChunk.suggestions)
           }
 
-          if (typedChunk.ui || typedChunk.report) {
+          if (hasRenderableContent && (sanitizedUi || sanitizedReport)) {
             setArtifactState((prev) => {
-              const queryResults = typedChunk.queryResults || []
               const newArtifact: Artifact = {
-                type: typedChunk.report ? 'report' : 'visualization',
-                ui: typedChunk.ui ?? undefined,
-                report: typedChunk.report ?? undefined,
+                type: sanitizedReport ? 'report' : 'visualization',
+                ui: sanitizedUi ?? undefined,
+                report: sanitizedReport ?? undefined,
                 queryResults,
                 dataSnapshot: buildArtifactDataSnapshot({
-                  ui: typedChunk.ui ?? undefined,
-                  report: typedChunk.report ?? undefined,
+                  ui: sanitizedUi ?? undefined,
+                  report: sanitizedReport ?? undefined,
                   queryResults,
                 }),
               }

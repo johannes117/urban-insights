@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import type { ReportSection } from '../lib/types'
+import { resolveRenderableRowsForDataPath } from '../lib/renderability'
 
 interface ReportSectionRendererProps {
   section: ReportSection
@@ -24,21 +25,6 @@ interface ReportSectionRendererProps {
 
 const CHART_COLORS = ['#374151', '#6b7280', '#9ca3af', '#d1d5db', '#e5e7eb']
 
-function getDataFromPath(data: Record<string, unknown>, path?: string): Record<string, unknown>[] {
-  if (!path) return []
-  const cleanPath = path.replace(/^\//, '')
-  const parts = cleanPath.split('/')
-  let result: unknown = data
-  for (const part of parts) {
-    if (result && typeof result === 'object' && part in result) {
-      result = (result as Record<string, unknown>)[part]
-    } else {
-      return []
-    }
-  }
-  return Array.isArray(result) ? result : []
-}
-
 function ReportBarChart({
   section,
   data,
@@ -46,8 +32,13 @@ function ReportBarChart({
   section: ReportSection
   data: Record<string, unknown>
 }) {
-  const chartData = getDataFromPath(data, section.dataPath)
-  if (!chartData.length || !section.xKey || !section.yKey) return null
+  if (!section.xKey || !section.yKey) return null
+
+  const { rows: chartData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
+    requiredKeys: [section.xKey, section.yKey],
+    requireAllKeys: true,
+  })
+  if (!chartData.length) return null
 
   return (
     <div className="chart-container my-4 rounded-lg bg-gray-50 p-4">
@@ -76,8 +67,13 @@ function ReportLineChart({
   section: ReportSection
   data: Record<string, unknown>
 }) {
-  const chartData = getDataFromPath(data, section.dataPath)
-  if (!chartData.length || !section.xKey || !section.yKey) return null
+  if (!section.xKey || !section.yKey) return null
+
+  const { rows: chartData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
+    requiredKeys: [section.xKey, section.yKey],
+    requireAllKeys: true,
+  })
+  if (!chartData.length) return null
 
   return (
     <div className="chart-container my-4 rounded-lg bg-gray-50 p-4">
@@ -112,8 +108,13 @@ function ReportPieChart({
   section: ReportSection
   data: Record<string, unknown>
 }) {
-  const chartData = getDataFromPath(data, section.dataPath)
-  if (!chartData.length || !section.nameKey || !section.valueKey) return null
+  if (!section.nameKey || !section.valueKey) return null
+
+  const { rows: chartData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
+    requiredKeys: [section.nameKey, section.valueKey],
+    requireAllKeys: true,
+  })
+  if (!chartData.length) return null
 
   return (
     <div className="chart-container my-4 rounded-lg bg-gray-50 p-4">
@@ -148,15 +149,21 @@ function ReportTable({
   section: ReportSection
   data: Record<string, unknown>
 }) {
-  const tableData = getDataFromPath(data, section.dataPath)
-  if (!tableData.length || !section.columns?.length) return null
+  const columns = section.columns?.filter((column) => column.trim().length > 0) ?? []
+  if (!columns.length) return null
+
+  const { rows: tableData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
+    requiredKeys: columns,
+    requireAllKeys: false,
+  })
+  if (!tableData.length) return null
 
   return (
     <div className="table-container my-4 overflow-x-auto">
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
-            {section.columns.map((col) => (
+            {columns.map((col) => (
               <th
                 key={col}
                 className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-left font-semibold"
@@ -169,7 +176,7 @@ function ReportTable({
         <tbody>
           {tableData.slice(0, 10).map((row, rowIndex) => (
             <tr key={rowIndex}>
-              {section.columns!.map((col) => {
+              {columns.map((col) => {
                 const value = row[col] ?? row[col.toLowerCase()] ?? ''
                 return (
                   <td key={col} className="border-b border-gray-100 px-3 py-2">
@@ -197,31 +204,31 @@ function ReportMetric({ section }: { section: ReportSection }) {
 }
 
 export function ReportSectionRenderer({ section, data }: ReportSectionRendererProps) {
+  let body: JSX.Element | null = null
+
+  if (section.type === 'text' && section.content) {
+    body = <p className="section-content leading-relaxed text-gray-700">{section.content}</p>
+  } else if (section.type === 'metric') {
+    body = <ReportMetric section={section} />
+  } else if (section.type === 'chart' && section.chartType === 'bar') {
+    body = <ReportBarChart section={section} data={data} />
+  } else if (section.type === 'chart' && section.chartType === 'line') {
+    body = <ReportLineChart section={section} data={data} />
+  } else if (section.type === 'chart' && section.chartType === 'pie') {
+    body = <ReportPieChart section={section} data={data} />
+  } else if (section.type === 'table') {
+    body = <ReportTable section={section} data={data} />
+  }
+
+  if (!body) return null
+
   return (
     <div className="report-section mb-8">
       {section.title && section.type !== 'metric' && (
         <h2 className="section-title mb-3 text-lg font-semibold text-gray-900">{section.title}</h2>
       )}
 
-      {section.type === 'text' && section.content && (
-        <p className="section-content leading-relaxed text-gray-700">{section.content}</p>
-      )}
-
-      {section.type === 'metric' && <ReportMetric section={section} />}
-
-      {section.type === 'chart' && section.chartType === 'bar' && (
-        <ReportBarChart section={section} data={data} />
-      )}
-
-      {section.type === 'chart' && section.chartType === 'line' && (
-        <ReportLineChart section={section} data={data} />
-      )}
-
-      {section.type === 'chart' && section.chartType === 'pie' && (
-        <ReportPieChart section={section} data={data} />
-      )}
-
-      {section.type === 'table' && <ReportTable section={section} data={data} />}
+      {body}
 
       {section.source && (
         <p className="section-source mt-2 text-xs italic text-gray-500">Source: {section.source}</p>

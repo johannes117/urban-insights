@@ -5,6 +5,7 @@ import { Renderer, DataProvider, ActionProvider, VisibilityProvider } from '@jso
 import type { UITree, UIElement } from '@json-render/core'
 import { componentRegistry } from './ui/registry'
 import type { NestedUIElement, QueryResult } from '../lib/types'
+import { sanitizeArtifactContent } from '../lib/renderability'
 
 interface JsonRenderViewProps {
   ui: NestedUIElement
@@ -45,47 +46,26 @@ function nestedToFlat(nested: NestedUIElement): UITree {
   }
 }
 
-function extractDataPathsFromUI(element: NestedUIElement): string[] {
-  const paths: string[] = []
-  if (element.props?.dataPath) {
-    paths.push(element.props.dataPath as string)
-  }
-  if (element.children) {
-    for (const child of element.children) {
-      paths.push(...extractDataPathsFromUI(child))
-    }
-  }
-  return paths
-}
-
 export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderViewProps) {
-  const flatTree = nestedToFlat(ui)
-
-  const data = useMemo(() => {
-    const merged: Record<string, unknown> = {}
-    for (const result of queryResults) {
-      merged[result.resultKey] = result.data
-    }
-
-    const requiredPaths = extractDataPathsFromUI(ui)
-    const availableKeys = Object.keys(merged)
-
-    for (const path of requiredPaths) {
-      const key = path.replace(/^\//, '').split('/')[0]
-      if (!availableKeys.includes(key)) {
-        console.warn(
-          `[JsonRenderView] UI requires dataPath "${path}" but key "${key}" not found in query results. Available keys:`,
-          availableKeys
-        )
-      }
-    }
-
-    if (requiredPaths.length > 0 && availableKeys.length === 0) {
-      console.warn('[JsonRenderView] UI has data paths but no query results were provided')
-    }
-
-    return merged
+  const { ui: renderableUi, data } = useMemo(() => {
+    return sanitizeArtifactContent({
+      ui,
+      queryResults,
+    })
   }, [queryResults, ui])
+
+  const flatTree = useMemo(() => {
+    if (!renderableUi) return null
+    return nestedToFlat(renderableUi)
+  }, [renderableUi])
+
+  if (!flatTree) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+        No renderable visualization data was returned for this result.
+      </div>
+    )
+  }
 
   const handleAction = (actionName: string) => {
     if (actionName === 'refresh') {

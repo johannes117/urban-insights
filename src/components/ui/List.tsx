@@ -25,14 +25,10 @@ export function List({ element }: ListProps) {
   }
 
   if (isEmpty) {
-    return (
-      <div className="flex h-24 flex-col items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500">
-        <svg className="mb-2 h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-        </svg>
-        <p className="text-sm">{error || 'No data available'}</p>
-      </div>
-    )
+    if (error) {
+      console.warn('[List] Skipping list render:', error)
+    }
+    return null
   }
 
   return (
