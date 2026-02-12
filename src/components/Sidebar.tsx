@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { MessageSquareText, SquarePen, Database, Trash2 } from 'lucide-react'
+import { MessageSquareText, SquarePen, Database, Trash2, Info } from 'lucide-react'
 
 interface SidebarProps {
   onNewChat?: () => void
@@ -132,6 +132,20 @@ export function Sidebar({
             }`}
           >
             Data sources
+          </span>
+        </Link>
+
+        <Link
+          to="/info"
+          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          <Info className="h-5 w-5 shrink-0" />
+          <span
+            className={`whitespace-nowrap text-sm transition-opacity duration-200 ${
+              isExpanded ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            Support
           </span>
         </Link>
       </div>

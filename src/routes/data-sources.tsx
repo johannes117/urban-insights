@@ -60,7 +60,7 @@ function DataSourcesPage() {
             </p>
             <p className="mb-4 leading-relaxed text-gray-600">
               Simply ask questions in natural language and Urban Insights will automatically query the
-              relevant data and generate visualisations.
+              relevant data and generate visualisations – see <Link to="/info" className="text-cyan-700 underline hover:text-cyan-900">Support</Link> for details.
             </p>
             <p className="mb-4 leading-relaxed text-gray-600">
               All data is organised by local government
