@@ -74,7 +74,6 @@ const reportSectionSchema = z.object({
 
 const reportSchema = z.object({
   title: z.string(),
-  recipient: z.string(),
   lga: z.string(),
   date: z.string(),
   introduction: z.string(),
@@ -99,7 +98,6 @@ Use this tool when the user wants to:
 
 REPORT STRUCTURE:
 - title: Report title (e.g., "Housing Affordability Crisis in [LGA]")
-- recipient: Who the report is for (e.g., "Councillor Jane Smith" or "City of Sydney Council")
 - lga: The local government area
 - date: Current date
 - introduction: Opening paragraph establishing the sender as a local resident and stating purpose
