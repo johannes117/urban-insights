@@ -94,9 +94,9 @@ export function Sidebar({
           className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
         >
           <img
-            src="/images/urban-insights-logo.png"
+            src="/images/urban-insights-logo-crop.png"
             alt="Urban Insights"
-            className="h-6 w-6 shrink-0 object-contain"
+            className="h-5 w-5 shrink-0 object-contain"
           />
           <span
             className={`whitespace-nowrap text-sm font-medium text-gray-900 transition-opacity duration-200 ${
