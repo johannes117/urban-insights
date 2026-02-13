@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as InfoRouteImport } from './routes/info'
 import { Route as DataSourcesRouteImport } from './routes/data-sources'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 
+const InfoRoute = InfoRouteImport.update({
+  id: '/info',
+  path: '/info',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DataSourcesRoute = DataSourcesRouteImport.update({
   id: '/data-sources',
   path: '/data-sources',
@@ -32,35 +38,46 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/data-sources': typeof DataSourcesRoute
+  '/info': typeof InfoRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/data-sources': typeof DataSourcesRoute
+  '/info': typeof InfoRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/data-sources': typeof DataSourcesRoute
+  '/info': typeof InfoRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/data-sources' | '/admin/'
+  fullPaths: '/' | '/data-sources' | '/info' | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/data-sources' | '/admin'
-  id: '__root__' | '/' | '/data-sources' | '/admin/'
+  to: '/' | '/data-sources' | '/info' | '/admin'
+  id: '__root__' | '/' | '/data-sources' | '/info' | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DataSourcesRoute: typeof DataSourcesRoute
+  InfoRoute: typeof InfoRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/info': {
+      id: '/info'
+      path: '/info'
+      fullPath: '/info'
+      preLoaderRoute: typeof InfoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/data-sources': {
       id: '/data-sources'
       path: '/data-sources'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DataSourcesRoute: DataSourcesRoute,
+  InfoRoute: InfoRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 export const routeTree = rootRouteImport

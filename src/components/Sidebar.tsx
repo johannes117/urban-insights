@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { MessageSquareText, SquarePen, Database, Trash2 } from 'lucide-react'
+import { MessageSquareText, SquarePen, Database, Trash2, Info } from 'lucide-react'
 
 interface SidebarProps {
   onNewChat?: () => void
@@ -88,14 +88,15 @@ export function Sidebar({
       onMouseLeave={supportsHover ? () => setIsExpanded(false) : undefined}
     >
       <div className="flex flex-col gap-1 p-2">
-        <Link
-          to="/"
-          className="flex h-10 items-center gap-3 rounded-lg px-2 transition-colors hover:bg-gray-100"
+        <button
+          type="button"
+          onClick={handleNewChat}
+          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
         >
           <img
-            src="/images/urban-insights-logo.png"
+            src="/images/urban-insights-logo-crop.png"
             alt="Urban Insights"
-            className="h-6 w-6 shrink-0 object-contain"
+            className="h-5 w-5 shrink-0 object-contain"
           />
           <span
             className={`whitespace-nowrap text-sm font-medium text-gray-900 transition-opacity duration-200 ${
@@ -104,7 +105,7 @@ export function Sidebar({
           >
             Urban Insights
           </span>
-        </Link>
+        </button>
 
         <button
           type="button"
@@ -132,6 +133,20 @@ export function Sidebar({
             }`}
           >
             Data sources
+          </span>
+        </Link>
+
+        <Link
+          to="/info"
+          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
+        >
+          <Info className="h-5 w-5 shrink-0" />
+          <span
+            className={`whitespace-nowrap text-sm transition-opacity duration-200 ${
+              isExpanded ? 'opacity-100' : 'opacity-0'
+            }`}
+          >
+            Support
           </span>
         </Link>
       </div>
