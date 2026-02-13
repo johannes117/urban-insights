@@ -90,7 +90,7 @@ function collectUiRequirements(
       )
     } else if (element.type === 'Table') {
       const columns = Array.isArray(element.props?.columns)
-        ? (element.props.columns as string[])
+        ? (element.props!.columns as string[])
         : null
       registerRequirement(requirements, resultKey, columns, MAX_TABLE_ROWS)
     } else {

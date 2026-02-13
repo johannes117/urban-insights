@@ -21,7 +21,7 @@ type StreamDoneChunk = {
   artifacts?: StreamArtifactPayload[]
   suggestions?: string[]
 }
-type StreamChunk = StreamTextChunk | StreamToolStartChunk | StreamToolEndChunk | StreamDoneChunk
+
 
 interface RenderedArtifact {
   type: 'visualization' | 'report'
@@ -603,7 +603,7 @@ export const streamMessage = createServerFn({ method: 'POST' })
     try {
       const stream = await agent.stream(
         { messages },
-        { recursionLimit: 50, streamMode: ['messages', 'values'] as const }
+        { recursionLimit: 50, streamMode: ['messages', 'values'] }
       )
 
       let finalMessages: BaseMessage[] = []
