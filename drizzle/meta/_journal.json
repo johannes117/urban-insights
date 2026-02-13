@@ -15,13 +15,6 @@
       "when": 1769835191946,
       "tag": "0001_talented_banshee",
       "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1770548684031,
-      "tag": "0002_safe_stone_men",
-      "breakpoints": true
     }
   ]
 }
