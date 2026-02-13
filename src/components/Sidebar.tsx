@@ -75,7 +75,7 @@ export function Sidebar({
     if (onNewChat) {
       onNewChat()
     } else {
-      navigate({ to: '/' })
+      navigate({ to: '/', search: { newchat: undefined } })
       window.location.reload()
     }
   }

@@ -23,11 +23,15 @@ function DataSourcesPage() {
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div className="flex justify-center px-6 py-4">
           <div className="flex w-full max-w-xl items-center">
-            <Link to="/" className="flex items-center gap-3">
+            <Link
+              to="/"
+              search={{ newchat: '1' }}
+              className="flex items-center gap-3 pl-1"
+            >
               <img
                 src="/images/urban-insights-logo-crop.png"
                 alt="Urban Insights"
-                className="h-10 w-auto"
+                className="h-11 w-auto"
               />
               <span className="font-medium text-gray-900">Urban Insights</span>
             </Link>
@@ -35,6 +39,7 @@ function DataSourcesPage() {
           <div className="ml-16 hidden w-48 shrink-0 items-center xl:flex">
             <Link
               to="/"
+              search={{ newchat: undefined }}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900"
             >
               Back to App
