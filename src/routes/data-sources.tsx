@@ -11,6 +11,7 @@ const sections = [
   { id: 'rental', title: 'Rental Affordability' },
   { id: 'house-prices', title: 'Median House Prices' },
   { id: 'housing-projections', title: 'Housing Projections' },
+  { id: 'transport', title: 'Transport Use' },
   { id: 'schools', title: 'Schools' },
   { id: 'disasters', title: 'Disaster Activations' },
   { id: 'crime', title: 'Crime Rates' },
@@ -232,9 +233,9 @@ function DataSourcesPage() {
               Population and housing occupancy are estimated by region covering:
             </p>
             <ul className="mb-6 list-disc space-y-1.5 pl-5 text-gray-600">
-              <li>size</li>
-              <li>distribution</li>
-              <li>composition</li>
+              <li>Size</li>
+              <li>Distribution</li>
+              <li>Composition</li>
             </ul>
             <p className="mb-3 text-gray-600">
               The projections give an idea of what is likely to happen if current
@@ -254,6 +255,51 @@ function DataSourcesPage() {
                 <div>
                   <span className="text-gray-400">Data period</span>
                   <p className="text-gray-700">2021–2036</p>
+                </div>
+                <div>
+                  <span className="text-gray-400">License</span>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
+                </div>
+              </div>
+              <div>
+                <p className="mt-4 text-gray-600">ⓒ Copyright State Government of Victoria</p>
+              </div>
+            </div>
+          </section>
+
+          <section id="transport" className="mb-12 scroll-mt-24">
+            <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
+              Transport Use
+              <span>
+                <a href="https://opendata.transport.vic.gov.au/dataset/victorian-integrated-survey-of-travel-and-activity-vista" target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={18} className="text-gray-400 hover:text-cyan-600 cursor-pointer" />
+                </a>
+              </span>
+            </h2>
+            <p className="mb-4 leading-relaxed text-gray-600">
+              A survey of more than 32,000 households about their travel behaviour, provided
+              by <span className="text-gray-900">Transport Victoria</span>.
+            </p>
+            <p className="mb-3 text-gray-600">The dataset is organised by 'trips', with details including:</p>
+            <ul className="mb-6 list-disc space-y-1.5 pl-5 text-gray-600">
+              <li>Primary mode of transport</li>
+              <li>Origin and destination</li>
+              <li>Purpose of journey</li>
+              <li>Time and duration</li>
+            </ul>
+            <div className="rounded-lg border border-gray-200 bg-white p-4 pb-3 pt-3 text-sm">
+              <div className="flex gap-8">
+                <div>
+                  <span className="text-gray-400">Coverage</span>
+                  <p className="text-gray-700">All Victorian LGAs</p>
+                </div>
+                <div>
+                  <span className="text-gray-400">Published</span>
+                  <p className="text-gray-700">2024</p>
+                </div>
+                <div>
+                  <span className="text-gray-400">Data period</span>
+                  <p className="text-gray-700">2024</p>
                 </div>
                 <div>
                   <span className="text-gray-400">License</span>
@@ -345,7 +391,7 @@ function DataSourcesPage() {
                 </div>
                 <div>
                   <span className="text-gray-400">License</span>
-                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/2.5/" target="_blank" rel="noopener noreferrer">CC BY 2.5</a></p>
+                  <p className="text-gray-700"><a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a></p>
                 </div>
               </div>
               <div>
