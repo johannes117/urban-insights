@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import {
   BarChart as RechartsBarChart,
@@ -14,107 +14,133 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-} from 'recharts'
-import type { ReportSection } from '../lib/types'
-import { resolveRenderableRowsForDataPath } from '../lib/renderability'
+} from "recharts";
+import type { ReportSection } from "../lib/types";
+import { resolveRenderableRowsForDataPath } from "../lib/renderability";
 
 interface ReportSectionRendererProps {
-  section: ReportSection
-  data: Record<string, unknown>
+  section: ReportSection;
+  data: Record<string, unknown>;
 }
 
-const CHART_COLORS = ['#374151', '#6b7280', '#9ca3af', '#d1d5db', '#e5e7eb']
+const CHART_COLORS = ["#374151", "#6b7280", "#9ca3af", "#d1d5db", "#e5e7eb"];
 
 function ReportBarChart({
   section,
   data,
 }: {
-  section: ReportSection
-  data: Record<string, unknown>
+  section: ReportSection;
+  data: Record<string, unknown>;
 }) {
-  if (!section.xKey || !section.yKey) return null
+  if (!section.xKey || !section.yKey) return null;
 
-  const { rows: chartData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
-    requiredKeys: [section.xKey, section.yKey],
-    requireAllKeys: true,
-  })
-  if (!chartData.length) return null
+  const { rows: chartData } = resolveRenderableRowsForDataPath(
+    data,
+    section.dataPath,
+    {
+      requiredKeys: [section.xKey, section.yKey],
+      requireAllKeys: true,
+    },
+  );
+  if (!chartData.length) return null;
 
   return (
     <div className="chart-container my-4 rounded-lg bg-gray-50 p-4">
       <ResponsiveContainer width="100%" height={200}>
-        <RechartsBarChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+        <RechartsBarChart
+          data={chartData}
+          margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey={section.xKey}
             tick={{ fontSize: 11 }}
             tickLine={false}
-            axisLine={{ stroke: '#e5e7eb' }}
+            axisLine={{ stroke: "#e5e7eb" }}
           />
-          <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+          <YAxis
+            tick={{ fontSize: 11 }}
+            tickLine={false}
+            axisLine={{ stroke: "#e5e7eb" }}
+          />
           <Tooltip />
           <Bar dataKey={section.yKey} fill="#374151" radius={[4, 4, 0, 0]} />
         </RechartsBarChart>
       </ResponsiveContainer>
     </div>
-  )
+  );
 }
 
 function ReportLineChart({
   section,
   data,
 }: {
-  section: ReportSection
-  data: Record<string, unknown>
+  section: ReportSection;
+  data: Record<string, unknown>;
 }) {
-  if (!section.xKey || !section.yKey) return null
+  if (!section.xKey || !section.yKey) return null;
 
-  const { rows: chartData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
-    requiredKeys: [section.xKey, section.yKey],
-    requireAllKeys: true,
-  })
-  if (!chartData.length) return null
+  const { rows: chartData } = resolveRenderableRowsForDataPath(
+    data,
+    section.dataPath,
+    {
+      requiredKeys: [section.xKey, section.yKey],
+      requireAllKeys: true,
+    },
+  );
+  if (!chartData.length) return null;
 
   return (
     <div className="chart-container my-4 rounded-lg bg-gray-50 p-4">
       <ResponsiveContainer width="100%" height={200}>
-        <RechartsLineChart data={chartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+        <RechartsLineChart
+          data={chartData}
+          margin={{ top: 10, right: 10, left: 10, bottom: 20 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
             dataKey={section.xKey}
             tick={{ fontSize: 11 }}
             tickLine={false}
-            axisLine={{ stroke: '#e5e7eb' }}
+            axisLine={{ stroke: "#e5e7eb" }}
           />
-          <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+          <YAxis
+            tick={{ fontSize: 11 }}
+            tickLine={false}
+            axisLine={{ stroke: "#e5e7eb" }}
+          />
           <Tooltip />
           <Line
             type="monotone"
             dataKey={section.yKey}
             stroke="#374151"
             strokeWidth={2}
-            dot={{ fill: '#374151', r: 4 }}
+            dot={{ fill: "#374151", r: 4 }}
           />
         </RechartsLineChart>
       </ResponsiveContainer>
     </div>
-  )
+  );
 }
 
 function ReportPieChart({
   section,
   data,
 }: {
-  section: ReportSection
-  data: Record<string, unknown>
+  section: ReportSection;
+  data: Record<string, unknown>;
 }) {
-  if (!section.nameKey || !section.valueKey) return null
+  if (!section.nameKey || !section.valueKey) return null;
 
-  const { rows: chartData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
-    requiredKeys: [section.nameKey, section.valueKey],
-    requireAllKeys: true,
-  })
-  if (!chartData.length) return null
+  const { rows: chartData } = resolveRenderableRowsForDataPath(
+    data,
+    section.dataPath,
+    {
+      requiredKeys: [section.nameKey, section.valueKey],
+      requireAllKeys: true,
+    },
+  );
+  if (!chartData.length) return null;
 
   return (
     <div className="chart-container my-4 rounded-lg bg-gray-50 p-4">
@@ -127,11 +153,16 @@ function ReportPieChart({
             cx="50%"
             cy="50%"
             outerRadius={70}
-            label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
-            labelLine={{ stroke: '#9ca3af' }}
+            label={({ name, percent }) =>
+              `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`
+            }
+            labelLine={{ stroke: "#9ca3af" }}
           >
             {chartData.map((_, index) => (
-              <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+              <Cell
+                key={index}
+                fill={CHART_COLORS[index % CHART_COLORS.length]}
+              />
             ))}
           </Pie>
           <Tooltip />
@@ -139,25 +170,30 @@ function ReportPieChart({
         </RechartsPieChart>
       </ResponsiveContainer>
     </div>
-  )
+  );
 }
 
 function ReportTable({
   section,
   data,
 }: {
-  section: ReportSection
-  data: Record<string, unknown>
+  section: ReportSection;
+  data: Record<string, unknown>;
 }) {
-  const columns = section.columns?.filter((column) => column.trim().length > 0) ?? []
-  if (!columns.length) return null
+  const columns =
+    section.columns?.filter((column) => column.trim().length > 0) ?? [];
+  if (!columns.length) return null;
 
-  const { rows: tableData } = resolveRenderableRowsForDataPath(data, section.dataPath, {
-    requiredKeys: columns,
-    requireAllKeys: false,
-    requireKeyCoverage: 'all',
-  })
-  if (!tableData.length) return null
+  const { rows: tableData } = resolveRenderableRowsForDataPath(
+    data,
+    section.dataPath,
+    {
+      requiredKeys: columns,
+      requireAllKeys: false,
+      requireKeyCoverage: "all",
+    },
+  );
+  if (!tableData.length) return null;
 
   return (
     <div className="table-container my-4 overflow-x-auto">
@@ -178,62 +214,77 @@ function ReportTable({
           {tableData.slice(0, 10).map((row, rowIndex) => (
             <tr key={rowIndex}>
               {columns.map((col) => {
-                const value = row[col] ?? row[col.toLowerCase()] ?? ''
+                const value = row[col] ?? row[col.toLowerCase()] ?? "";
                 return (
                   <td key={col} className="border-b border-gray-100 px-3 py-2">
                     {String(value)}
                   </td>
-                )
+                );
               })}
             </tr>
           ))}
         </tbody>
       </table>
     </div>
-  )
+  );
 }
 
 function ReportMetric({ section }: { section: ReportSection }) {
   return (
     <div className="metric-display my-4 inline-block rounded-lg bg-gray-100 px-6 py-4">
-      <div className="metric-value text-3xl font-bold text-gray-900">{section.content}</div>
+      <div className="metric-value text-3xl font-bold text-gray-900">
+        {section.content}
+      </div>
       {section.title && (
-        <div className="metric-label mt-1 text-sm text-gray-600">{section.title}</div>
+        <div className="metric-label mt-1 text-sm text-gray-600">
+          {section.title}
+        </div>
       )}
     </div>
-  )
+  );
 }
 
-export function ReportSectionRenderer({ section, data }: ReportSectionRendererProps) {
-  let body: JSX.Element | null = null
+export function ReportSectionRenderer({
+  section,
+  data,
+}: ReportSectionRendererProps) {
+  let body: React.ReactNode | null = null;
 
-  if (section.type === 'text' && section.content) {
-    body = <p className="section-content leading-relaxed text-gray-700">{section.content}</p>
-  } else if (section.type === 'metric') {
-    body = <ReportMetric section={section} />
-  } else if (section.type === 'chart' && section.chartType === 'bar') {
-    body = <ReportBarChart section={section} data={data} />
-  } else if (section.type === 'chart' && section.chartType === 'line') {
-    body = <ReportLineChart section={section} data={data} />
-  } else if (section.type === 'chart' && section.chartType === 'pie') {
-    body = <ReportPieChart section={section} data={data} />
-  } else if (section.type === 'table') {
-    body = <ReportTable section={section} data={data} />
+  if (section.type === "text" && section.content) {
+    body = (
+      <p className="section-content leading-relaxed text-gray-700">
+        {section.content}
+      </p>
+    );
+  } else if (section.type === "metric") {
+    body = <ReportMetric section={section} />;
+  } else if (section.type === "chart" && section.chartType === "bar") {
+    body = <ReportBarChart section={section} data={data} />;
+  } else if (section.type === "chart" && section.chartType === "line") {
+    body = <ReportLineChart section={section} data={data} />;
+  } else if (section.type === "chart" && section.chartType === "pie") {
+    body = <ReportPieChart section={section} data={data} />;
+  } else if (section.type === "table") {
+    body = <ReportTable section={section} data={data} />;
   }
 
-  if (!body) return null
+  if (!body) return null;
 
   return (
     <div className="report-section mb-8">
-      {section.title && section.type !== 'metric' && (
-        <h2 className="section-title mb-3 text-lg font-semibold text-gray-900">{section.title}</h2>
+      {section.title && section.type !== "metric" && (
+        <h2 className="section-title mb-3 text-lg font-semibold text-gray-900">
+          {section.title}
+        </h2>
       )}
 
       {body}
 
       {section.source && (
-        <p className="section-source mt-2 text-xs italic text-gray-500">Source: {section.source}</p>
+        <p className="section-source mt-2 text-xs italic text-gray-500">
+          Source: {section.source}
+        </p>
       )}
     </div>
-  )
+  );
 }
