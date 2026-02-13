@@ -82,7 +82,7 @@ export function Sidebar({
 
   return (
     <div
-      className="group/sidebar flex h-screen flex-col border-r border-gray-200 bg-gray-50 transition-all duration-200"
+      className="group/sidebar flex h-screen flex-col border-r border-gray-300 bg-gray-50 transition-all duration-200"
       style={{ width: isExpanded ? (supportsHover ? '280px' : 'min(280px, 82vw)') : '56px' }}
       onMouseEnter={supportsHover ? () => setIsExpanded(true) : undefined}
       onMouseLeave={supportsHover ? () => setIsExpanded(false) : undefined}
