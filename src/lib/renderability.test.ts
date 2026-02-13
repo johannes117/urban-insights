@@ -87,7 +87,6 @@ describe('renderability', () => {
   it('removes non-renderable report chart sections while keeping text sections', () => {
     const report: Report = {
       title: 'Community Safety',
-      recipient: 'Council',
       lga: 'Test LGA',
       date: '2026-02-12',
       introduction: 'Intro',

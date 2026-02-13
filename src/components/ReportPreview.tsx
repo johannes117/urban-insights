@@ -69,11 +69,6 @@ export function ReportPreview({ report, queryResults }: ReportPreviewProps) {
               font-size: 14px;
             }
 
-            .report-recipient {
-              margin-bottom: 24px;
-              font-size: 15px;
-            }
-
             .report-intro {
               margin-bottom: 32px;
               font-size: 15px;
@@ -253,10 +248,6 @@ export function ReportPreview({ report, queryResults }: ReportPreviewProps) {
             <p className="report-meta text-sm text-gray-500">
               {report.lga} • {report.date}
             </p>
-          </div>
-
-          <div className="report-recipient mb-6">
-            <p className="text-gray-700">Dear {report.recipient},</p>
           </div>
 
           <div className="report-intro mb-8">

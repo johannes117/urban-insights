@@ -80,7 +80,6 @@ export interface ReportSection {
 
 export interface Report {
   title: string
-  recipient: string
   lga: string
   date: string
   introduction: string
