@@ -94,7 +94,7 @@ export function Sidebar({
           className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
         >
           <img
-            src="/images/urban-insights-logo-crop.png"
+            src="/logo192.png"
             alt="Urban Insights"
             className="h-5 w-5 shrink-0 object-contain"
           />

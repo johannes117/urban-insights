@@ -25,9 +25,9 @@ function DataSourcesPage() {
           <div className="flex w-full max-w-xl items-center">
             <Link to="/" className="flex items-center gap-3">
               <img
-                src="/images/urban-insights-logo.png"
+                src="/images/urban-insights-logo-crop.png"
                 alt="Urban Insights"
-                className="h-7 w-auto"
+                className="h-10 w-auto"
               />
               <span className="font-medium text-gray-900">Urban Insights</span>
             </Link>
