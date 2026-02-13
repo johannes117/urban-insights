@@ -83,7 +83,7 @@ export function Sidebar({
   return (
     <div
       className="group/sidebar flex h-screen flex-col border-r border-gray-300 bg-gray-50 transition-all duration-200"
-      style={{ width: isExpanded ? (supportsHover ? '280px' : 'min(280px, 82vw)') : '56px' }}
+      style={{ width: isExpanded ? (supportsHover ? '280px' : 'min(280px, 82vw)') : '62px' }}
       onMouseEnter={supportsHover ? () => setIsExpanded(true) : undefined}
       onMouseLeave={supportsHover ? () => setIsExpanded(false) : undefined}
     >
@@ -91,12 +91,12 @@ export function Sidebar({
         <button
           type="button"
           onClick={handleNewChat}
-          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
+          className="flex h-10 items-center gap-2 rounded-lg pl-2.5 text-gray-700 transition-colors hover:bg-gray-100"
         >
           <img
             src="/logo192.png"
             alt="Urban Insights"
-            className="h-5 w-5 shrink-0 object-contain"
+            className="h-7 w-7 shrink-0 object-contain"
           />
           <span
             className={`whitespace-nowrap text-sm font-medium text-gray-900 transition-opacity duration-200 ${
@@ -110,9 +110,9 @@ export function Sidebar({
         <button
           type="button"
           onClick={handleNewChat}
-          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
+          className="flex h-10 items-center gap-3 rounded-lg pl-2.5 text-gray-700 transition-colors hover:bg-gray-100"
         >
-          <SquarePen className="h-5 w-5 shrink-0" />
+          <SquarePen className="h-6 w-6 shrink-0" />
           <span
             className={`whitespace-nowrap text-sm transition-opacity duration-200 ${
               isExpanded ? 'opacity-100' : 'opacity-0'
@@ -124,9 +124,9 @@ export function Sidebar({
 
         <Link
           to="/data-sources"
-          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
+          className="flex h-10 items-center gap-3 rounded-lg pl-2.5 text-gray-700 transition-colors hover:bg-gray-100"
         >
-          <Database className="h-5 w-5 shrink-0" />
+          <Database className="h-6 w-6 shrink-0" />
           <span
             className={`whitespace-nowrap text-sm transition-opacity duration-200 ${
               isExpanded ? 'opacity-100' : 'opacity-0'
@@ -138,9 +138,9 @@ export function Sidebar({
 
         <Link
           to="/info"
-          className="flex h-10 items-center gap-3 rounded-lg px-2 text-gray-700 transition-colors hover:bg-gray-100"
+          className="flex h-10 items-center gap-3 rounded-lg pl-2.5 text-gray-700 transition-colors hover:bg-gray-100"
         >
-          <Info className="h-5 w-5 shrink-0" />
+          <Info className="h-6 w-6 shrink-0" />
           <span
             className={`whitespace-nowrap text-sm transition-opacity duration-200 ${
               isExpanded ? 'opacity-100' : 'opacity-0'
