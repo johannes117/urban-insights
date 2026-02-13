@@ -37,7 +37,6 @@ Refer to `.env.example` for alternative providers and other relevant fields.
 | `bun run db:generate` | Generate database migrations |
 | `bun run db:push` | Push schema to database |
 | `bun run db:studio` | Open Drizzle Studio |
-| `bun run db:lowercase-datasets` | Lowercase dataset names |
 
 ## Database Migrations
 
