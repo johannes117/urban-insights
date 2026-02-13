@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { ExternalLink } from 'lucide-react'
 
 export const Route = createFileRoute('/info')({
   component: InfoPage,
@@ -77,13 +76,16 @@ function InfoPage() {
             </div>
           </section>
 
-          <section id="plainlang" className="mb-12 scroll-mt-24">
+          <section id="features" className="mb-6 scroll-mt-24">
             <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
               Key features
             </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
               So, what makes Urban Insights different from other tools?
             </p>
+          </section>
+
+          <section id="plainlang" className="mb-12 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Natural Language</h3>
             <p className="mb-4 leading-relaxed text-gray-600">
               First, Urban Insights uses a natural language interface, allowing you to pose directly
@@ -93,6 +95,9 @@ function InfoPage() {
               Responses are similarly designed to be accessible and easy to understand. Urban Insights
               will draw out requested details, and explain interesting trends in the data.
             </p>
+          </section>
+
+          <section id="dataqual" className="mb-12 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Curated, Authoritative Datasets</h3>
             <p className="mb-4 leading-relaxed text-gray-600">
               Of course, many generic tools can query data in natural language. However, Urban Insights
@@ -106,16 +111,21 @@ function InfoPage() {
               This should provide confidence that the insights you receive are based on real data, not just
               plausible-sounding numbers.
             </p>
-
             <p className="mb-4 leading-relaxed text-gray-600">
               Future deployments of the tooling can be configured with alternative datasets to serve other
               regions, or even address subject matter beyond livability standards.
             </p>
+          </section>
+
+          <section id="visualisation" className="mb-12 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Dynamic Visualisations</h3>
             <p className="mb-4 leading-relaxed text-gray-600">
-              Urban Insights generates appropriate visualisatons for the questions you pose.
+              Urban Insights generates appropriate visualisations for the questions you pose.
               Textual insights are supported with charts (bar, line, pie, etc.) and tables.
             </p>
+          </section>
+
+          <section id="reporting" className="mb-12 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Report Generation</h3>
             <p className="mb-4 leading-relaxed text-gray-600">
               On request, Urban Insights can even compile your query results into formatted reports for sharing with

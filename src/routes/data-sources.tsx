@@ -219,7 +219,7 @@ function DataSourcesPage() {
               </span>
             </h2>
             <p className="mb-4 leading-relaxed text-gray-600">
-              The Victoria in Future dataset projects population growth an dwelling occupancy
+              The Victoria in Future dataset projects population growth and dwelling occupancy
               over the period 2021–2036, provided by the <span className="text-gray-900">Department of Transport
               and Planning</span>.
             </p>
