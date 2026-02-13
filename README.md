@@ -1,34 +1,35 @@
 # Urban Insights
 
-A web application developed by Team 1 that synthesises urban liveability data to help local governments and organisations prioritise sustainable development efforts, supporting UN Sustainable Development Goal 11: Sustainable Cities and Communities.
+A web application developed by TP6 Team 1 that synthesises urban liveability data to help local governments and organisations prioritise sustainable development efforts.
+
+The application was developed in support of UN Sustainable Development Goal 11: [Sustainable Cities and Communities](https://www.un.org/sustainabledevelopment/cities/). Initial datasets focus on Victoria, Australia, but the architecture allows for easy translation to other regions and data sources.
 
 ## Getting Started
+
+After populating `.env` (see below), run:
 
 ```bash
 bun install
 bun run dev
-npm test
 ```
 
-The app will be available at http://localhost:3000.
+The app will be available at <http://localhost:3000>. Datasets can be managed at <http://localhost:3000/admin>.
 
 ## Environment Variables
 
-Create a `.env` file with:
+Create a `.env` file with, at a minimum:
 
 ```env
 DATABASE_URL=your_neon_postgres_url
 ANTHROPIC_API_KEY=your_anthropic_key
-
-# Google OAuth (optional - for user auth)
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
 ```
+
+Refer to `.env.example` for alternative providers and other relevant fields.
 
 ## Scripts
 
 | Command | Description |
-|---------|-------------|
+| ------- | ----------- |
 | `bun run dev` | Start development server |
 | `bun run build` | Build for production |
 | `bun run preview` | Preview production build |
@@ -36,6 +37,7 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 | `bun run db:generate` | Generate database migrations |
 | `bun run db:push` | Push schema to database |
 | `bun run db:studio` | Open Drizzle Studio |
+| `bun run db:lowercase-datasets` | Lowercase dataset names |
 
 ## Database Migrations
 
@@ -49,6 +51,5 @@ bun run scripts/migrate.ts
 
 - **AI Chat Interface**: Conversational AI for querying Victorian census and urban data
 - **Dynamic Visualizations**: Auto-generated charts, tables, and dashboards
-- **Google Sign-In**: Optional authentication for saving chat history
-- **Chat History**: Persistent conversations for signed-in users
+- **Chat History**: Persistent conversations using browser cache
 - **LGA Context**: Filter queries by Local Government Area
