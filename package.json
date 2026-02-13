@@ -9,8 +9,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
-    "db:lowercase-datasets": "bun run scripts/lowercaseDatasets.ts"
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.15",
