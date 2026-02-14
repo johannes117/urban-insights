@@ -95,7 +95,7 @@ export function ArtifactPanel({
               </div>
             </div>
           ) : (
-            <JsonRenderView ui={ui!} queryResults={queryResults} />
+            <JsonRenderView key={artifactIndex} ui={ui!} queryResults={queryResults} />
           )}
         </div>
       )}
