@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildArtifactDataSnapshot, mergeQueryResultsWithSnapshot } from './artifactSnapshots'
-import type { QueryResult } from './types'
+import {
+  buildArtifactDataSnapshot,
+  mergeQueryResultsWithSnapshot,
+  snapshotHasRows,
+} from '@/lib/artifactSnapshots'
+import type { QueryResult } from '@/lib/types'
 
 describe('artifactSnapshots', () => {
   it('creates a compact snapshot using only required chart fields', () => {
@@ -54,5 +58,23 @@ describe('artifactSnapshots', () => {
         partial: true,
       },
     ])
+  })
+})
+
+describe('snapshotHasRows', () => {
+  it('returns true when snapshot has data for the key', () => {
+    expect(snapshotHasRows({ crime: [{ year: 2024 }] }, 'crime')).toBe(true)
+  })
+
+  it('returns false for missing key', () => {
+    expect(snapshotHasRows({ crime: [{ year: 2024 }] }, 'housing')).toBe(false)
+  })
+
+  it('returns false for undefined snapshot', () => {
+    expect(snapshotHasRows(undefined, 'crime')).toBe(false)
+  })
+
+  it('returns false for empty array', () => {
+    expect(snapshotHasRows({ crime: [] }, 'crime')).toBe(false)
   })
 })

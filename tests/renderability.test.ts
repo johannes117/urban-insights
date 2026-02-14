@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildQueryResultData,
   collectArtifactRenderabilityIssues,
+  hasRenderableReport,
+  isReportSectionRenderable,
   pruneNonRenderableReport,
   pruneNonRenderableUi,
   resolveRenderableRowsForDataPath,
   sanitizeArtifactContent,
-} from './renderability'
-import type { NestedUIElement, QueryResult, Report } from './types'
+  toResultKey,
+} from '@/lib/renderability'
+import type { NestedUIElement, QueryResult, Report } from '@/lib/types'
 
 describe('renderability', () => {
   it('normalizes required keys case-insensitively for chart rows', () => {
@@ -176,5 +180,66 @@ describe('renderability', () => {
 
     expect(issues).toHaveLength(1)
     expect(issues[0]?.availableKeys).toEqual(['suburb', 'apr_jun_2025'])
+  })
+})
+
+describe('toResultKey', () => {
+  it('extracts the first path segment from a data path', () => {
+    expect(toResultKey('/crime_trend')).toBe('crime_trend')
+    expect(toResultKey('/nested/path')).toBe('nested')
+  })
+
+  it('returns null for empty or missing paths', () => {
+    expect(toResultKey(undefined)).toBeNull()
+    expect(toResultKey('')).toBeNull()
+    expect(toResultKey('/')).toBeNull()
+  })
+})
+
+describe('buildQueryResultData', () => {
+  it('converts query results into a keyed data object', () => {
+    const data = buildQueryResultData([
+      { resultKey: 'crime', data: [{ year: 2024 }] },
+      { resultKey: 'housing', data: [{ price: 500000 }] },
+    ])
+
+    expect(data).toEqual({
+      crime: [{ year: 2024 }],
+      housing: [{ price: 500000 }],
+    })
+  })
+
+  it('returns empty object for empty input', () => {
+    expect(buildQueryResultData([])).toEqual({})
+  })
+})
+
+describe('isReportSectionRenderable', () => {
+  it('considers text sections with content as renderable', () => {
+    expect(isReportSectionRenderable({ type: 'text', title: 'Summary', content: 'Some text' }, {})).toBe(true)
+  })
+
+  it('considers empty text sections as non-renderable', () => {
+    expect(isReportSectionRenderable({ type: 'text', title: 'Summary', content: '   ' }, {})).toBe(false)
+  })
+})
+
+describe('hasRenderableReport', () => {
+  it('returns false for null report', () => {
+    expect(hasRenderableReport(null, {})).toBe(false)
+  })
+
+  it('returns true when report has introduction text', () => {
+    const report: Report = {
+      title: 'Test',
+      lga: 'Test',
+      date: '2026-01-01',
+      introduction: 'Some intro',
+      callToAction: '',
+      closing: '',
+      sources: [],
+      sections: [],
+    }
+    expect(hasRenderableReport(report, {})).toBe(true)
   })
 })

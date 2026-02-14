@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 
-// Mock database dependencies before importing the module
-vi.mock('../db', () => ({
+vi.mock('../src/db', () => ({
   db: {},
   datasets: {},
 }))
@@ -18,7 +17,7 @@ vi.mock('@langchain/core/tools', () => ({
   tool: vi.fn((fn, config) => ({ fn, config })),
 }))
 
-import { validateSelectQuery } from './datasetTools'
+import { validateSelectQuery } from '@/lib/datasetTools'
 
 describe('validateSelectQuery', () => {
   it('allows valid SELECT queries', () => {
