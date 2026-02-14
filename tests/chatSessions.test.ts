@@ -5,8 +5,8 @@ import {
   createChatSessionSnapshot,
   loadChatSessions,
   saveChatSessions,
-} from './chatSessions'
-import type { Message } from './types'
+} from '@/lib/chatSessions'
+import type { Message } from '@/lib/types'
 
 function createMemoryStorage(initialValue?: string) {
   const values = new Map<string, string>()
