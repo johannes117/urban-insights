@@ -234,11 +234,11 @@ export function ReportPreview({ report, queryResults }: ReportPreviewProps) {
           ref={reportRef}
           className="mx-auto max-w-3xl rounded-lg bg-white p-8 shadow-sm"
         >
-          <div className="report-logo mb-6">
+          <div className="report-logo mb-6 pt-3 pr-5 flex justify-end">
             <img
-              src={`${typeof window !== 'undefined' ? window.location.origin : ''}/images/urban-insights-logo.png`}
+              src={`${typeof window !== 'undefined' ? window.location.origin : ''}/images/urban-insights-logo-crop.png`}
               alt="Urban Insights"
-              className="h-12 w-auto max-h-14 object-contain"
+              className="h-15 w-auto max-h-15 object-contain"
             />
           </div>
           <div className="report-header mb-8 border-b-2 border-gray-200 pb-6">

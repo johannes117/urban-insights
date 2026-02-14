@@ -19,11 +19,15 @@ function InfoPage() {
       <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
         <div className="flex justify-center px-6 py-4">
           <div className="flex w-full max-w-xl items-center">
-            <Link to="/" className="flex items-center gap-3">
+            <Link
+              to="/"
+              search={{ newchat: '1' }}
+              className="flex items-center gap-3 pl-1"
+            >
               <img
-                src="/images/urban-insights-logo.png"
+                src="/images/urban-insights-logo-crop.png"
                 alt="Urban Insights"
-                className="h-7 w-auto"
+                className="h-11 w-auto"
               />
               <span className="font-medium text-gray-900">Urban Insights</span>
             </Link>
@@ -31,6 +35,7 @@ function InfoPage() {
           <div className="ml-16 hidden w-48 shrink-0 items-center xl:flex">
             <Link
               to="/"
+              search={{ newchat: undefined }}
               className="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900"
             >
               Back to App
@@ -80,60 +85,66 @@ function InfoPage() {
             <h2 className="mb-4 text-2xl flex items-center gap-2 font-semibold text-gray-900">
               Key features
             </h2>
-            <p className="mb-4 leading-relaxed text-gray-600">
+            <p className="mb-3 leading-relaxed text-gray-600">
               So, what makes Urban Insights different from other tools?
             </p>
           </section>
 
-          <section id="plainlang" className="mb-12 scroll-mt-24">
+          <section id="plainlang" className="mb-6 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Natural Language</h3>
-            <p className="mb-4 leading-relaxed text-gray-600">
-              First, Urban Insights uses a natural language interface, allowing you to pose directly
-              the questions you need answered. This is in contrast to browsing the technically-oriented
-              data portals provided by government agencies.
-
-              Responses are similarly designed to be accessible and easy to understand. Urban Insights
-              will draw out requested details, and explain interesting trends in the data.
+            <p className="mb-3 leading-relaxed text-gray-600">
+              First, Urban Insights uses a natural, conversational language interface, allowing you to pose
+              the questions you need answered. Urban Insights will draw out requested details, and explain
+              other interesting trends in the data. Follow-up questions allow digging deeper or clarifying these results.
+            </p>
+            <p className="mb-3 leading-relaxed text-gray-600">
+              This conversational approach offers a more intuitive approach than directly browsing the technically-oriented,
+              raw data portals often provided by government agencies.
+            </p>
+            <p className="mb-3 leading-relaxed text-gray-600">
+              In addition, recent conversations are retained in the session history (left panel), allowing you return to previous investigations
+              and build on them. Visualisations within these conversations may be reviewed using the forward and back buttons at
+              the top right of the page.
             </p>
           </section>
 
-          <section id="dataqual" className="mb-12 scroll-mt-24">
+          <section id="dataqual" className="mb-6 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Curated, Authoritative Datasets</h3>
-            <p className="mb-4 leading-relaxed text-gray-600">
+            <p className="mb-3 leading-relaxed text-gray-600">
               Of course, many generic tools can query data in natural language. However, Urban Insights
               has been specifically designed to access only curated, authoritative datasets from
               government agencies. This ensures that the insights you receive are based on high-quality
               data that you can trust (see <Link to="/data-sources" className="text-cyan-700 underline hover:text-cyan-900">Data Sources</Link>).
             </p>
-            <p className="mb-4 leading-relaxed text-gray-600">
+            <p className="mb-3 leading-relaxed text-gray-600">
               You may notice that Urban Insights will refuse to answer questions that fall outside of the scope
               of the data available. For example, asking about regions outside of Victoria will not yield useful results.
               This should provide confidence that the insights you receive are based on real data, not just
               plausible-sounding numbers.
             </p>
-            <p className="mb-4 leading-relaxed text-gray-600">
+            <p className="mb-3 leading-relaxed text-gray-600">
               Future deployments of the tooling can be configured with alternative datasets to serve other
               regions, or even address subject matter beyond livability standards.
             </p>
           </section>
 
-          <section id="visualisation" className="mb-12 scroll-mt-24">
+          <section id="visualisation" className="mb-6 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Dynamic Visualisations</h3>
-            <p className="mb-4 leading-relaxed text-gray-600">
+            <p className="mb-3 leading-relaxed text-gray-600">
               Urban Insights generates appropriate visualisations for the questions you pose.
               Textual insights are supported with charts (bar, line, pie, etc.) and tables.
             </p>
           </section>
 
-          <section id="reporting" className="mb-12 scroll-mt-24">
+          <section id="reporting" className="mb-6 scroll-mt-24">
             <h3 className="mb-3 text-lg font-semibold text-gray-700">Report Generation</h3>
-            <p className="mb-4 leading-relaxed text-gray-600">
+            <p className="mb-3 leading-relaxed text-gray-600">
               On request, Urban Insights can even compile your query results into formatted reports for sharing with
               colleagues, neighbours, government representatives, or anyone else who might be interested. Just tell
               Urban Insights you would like to generate a report, and answer a few follow-up questions about
               intended audience and content. The generated report can then be downloaded as a PDF document.
             </p>
-            <p className="mb-4 leading-relaxed text-gray-600">
+            <p className="mb-3 leading-relaxed text-gray-600">
               In addition, Urban Insights' commitment to data quality (see above) means that readers
               can trust that the data and insights contained in the report are based on real, authoritative sources.
             </p>
