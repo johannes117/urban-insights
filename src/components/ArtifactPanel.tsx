@@ -54,7 +54,7 @@ export function ArtifactPanel({
         <div className="flex items-center justify-end gap-2 border-b border-gray-100 px-6 py-4">
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-500 bg-white text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => onArtifactIndexChange(artifactIndex - 1)}
             disabled={artifactIndex <= 0}
             aria-label="Previous artifact"
@@ -68,7 +68,7 @@ export function ArtifactPanel({
           </span>
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-500 bg-white text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => onArtifactIndexChange(artifactIndex + 1)}
             disabled={artifactIndex >= artifactCount - 1}
             aria-label="Next artifact"
