@@ -72,7 +72,7 @@ function InfoPage() {
             <iframe
               width="100%"
               height="350"
-              src="https://www.youtube.com/embed/bauUooCUkKc?rel=0"
+              src="https://www.youtube.com/embed/-he4ns3PPJE?rel=0"
               title="Urban Insights Demo"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
