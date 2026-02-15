@@ -62,6 +62,10 @@ export function WelcomeScreen({
         alt="Urban Insights"
         className="mt-6 h-24 w-auto"
       />
+
+      <p className="mt-7 max-w-md text-center text-xs text-gray-400">
+        All large language model outputs are informational only, and should<br></br> not serve as the sole basis for decision-making.
+      </p>
     </div>
   )
 }
