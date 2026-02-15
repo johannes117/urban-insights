@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Renderer, DataProvider, ActionProvider, VisibilityProvider } from '@json-render/react'
 import type { UITree, UIElement } from '@json-render/core'
 import { componentRegistry } from './ui/registry'
@@ -54,6 +54,13 @@ export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderView
     })
   }, [queryResults, ui])
 
+  const dataVersionRef = useRef(0)
+  const prevDataRef = useRef<Record<string, unknown> | null>(null)
+  if (prevDataRef.current !== data) {
+    prevDataRef.current = data
+    dataVersionRef.current++
+  }
+
   const flatTree = useMemo(() => {
     if (!renderableUi) return null
     return nestedToFlat(renderableUi)
@@ -82,7 +89,7 @@ export default function JsonRenderView({ ui, queryResults = [] }: JsonRenderView
   }>
 
   return (
-    <DataProvider initialData={data}>
+    <DataProvider key={dataVersionRef.current} initialData={data}>
       <VisibilityProvider>
         <ActionProviderWithActions
           actions={{
