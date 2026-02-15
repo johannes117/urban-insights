@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, useSearch, useNavigate } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
@@ -192,9 +192,13 @@ function App() {
   const hasArtifact = artifactState.items.length > 0
   const currentArtifact =
     artifactState.index >= 0 ? artifactState.items[artifactState.index] ?? null : null
-  const currentArtifactQueryResults = currentArtifact
-    ? mergeQueryResultsWithSnapshot(currentArtifact.queryResults, currentArtifact.dataSnapshot)
-    : []
+  const currentArtifactQueryResults = useMemo(
+    () =>
+      currentArtifact
+        ? mergeQueryResultsWithSnapshot(currentArtifact.queryResults, currentArtifact.dataSnapshot)
+        : [],
+    [currentArtifact]
+  )
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId
