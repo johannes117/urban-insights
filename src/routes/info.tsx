@@ -7,7 +7,7 @@ export const Route = createFileRoute('/info')({
 const sections = [
   { id: 'overview', title: 'Overview' },
   { id: 'features', title: 'Key Features' },
-  { id: 'plainlang', title: 'Plain Language Interface' },
+  { id: 'plainlang', title: 'Natural Language' },
   { id: 'dataqual', title: 'Authoritative Datasets' },
   { id: 'visualisation', title: 'Dynamic Visualisations' },
   { id: 'reporting', title: 'Report Generation' },
@@ -63,7 +63,7 @@ function InfoPage() {
             </p>
             <p className="leading-relaxed text-gray-600">
               Simply ask questions in natural language and Urban Insights will automatically query the
-              relevant data and generate visualisations. This video demonstrates
+              relevant data to generate summaries and visualisations. This video demonstrates
               the basics, but the rest is really up to you. Ask any question you like, and Urban
               Insights will do its best to answer it using the data available.
             </p>
@@ -72,7 +72,7 @@ function InfoPage() {
             <iframe
               width="100%"
               height="350"
-              src="https://www.youtube.com/embed/A5Je3eCwrpA?rel=0"
+              src="https://www.youtube.com/embed/bauUooCUkKc?rel=0"
               title="Urban Insights Demo"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
