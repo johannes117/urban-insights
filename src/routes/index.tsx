@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useSearch, useNavigate } from '@tanstack/react-router'
 import { ChatPanel } from '../components/ChatPanel'
 import { ArtifactPanel } from '../components/ArtifactPanel'
 import { WelcomeScreen } from '../components/WelcomeScreen'
@@ -31,6 +31,9 @@ import type {
 export const Route = createFileRoute('/')({
   component: App,
   ssr: false,
+  validateSearch: (search: Record<string, unknown>) => ({
+    newchat: search.newchat as string | undefined,
+  }),
 })
 
 const EMPTY_ARTIFACT_STATE: ArtifactStateSnapshot = { items: [], index: -1 }
@@ -169,6 +172,9 @@ function buildRehydrateQueries(session: ChatSessionSnapshot): Array<{ resultKey:
 }
 
 function App() {
+  const search = useSearch({ from: '/' })
+  const navigate = useNavigate()
+
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [artifactState, setArtifactState] = useState<ArtifactStateSnapshot>(EMPTY_ARTIFACT_STATE)
@@ -510,6 +516,15 @@ function App() {
     setSuggestions([])
     setArtifactState(EMPTY_ARTIFACT_STATE)
   }
+
+  // Handle newchat query parameter from info page
+  useEffect(() => {
+    if (search.newchat === '1') {
+      handleNewChat()
+      // Remove the parameter from URL after handling
+      navigate({ to: '/', search: { newchat: undefined }, replace: true })
+    }
+  }, [search.newchat])
 
   const handleSelectSession = (sessionId: string) => {
     if (isLoading) return
